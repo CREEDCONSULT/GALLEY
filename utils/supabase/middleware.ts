@@ -8,8 +8,9 @@ export async function updateSession(request: NextRequest) {
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const isDemo = request.cookies.get('demo_mode')?.value === 'true'
 
-    if (!url || !key) {
+    if ((!url || !key) || isDemo) {
         return supabaseResponse
     }
 

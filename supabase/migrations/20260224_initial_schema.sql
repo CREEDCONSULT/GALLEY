@@ -37,7 +37,20 @@ CREATE TABLE IF NOT EXISTS public.content_assets (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL,
   content TEXT, -- Markdown content
-  status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'pending', 'scheduled', 'published')),
+  status TEXT DEFAULT 'draft' CHECK (status IN (
+    'draft', 
+    'pending_brief_approval', 
+    'drafting', 
+    'pending_content_review', 
+    'pending_distribution', 
+    'scheduled', 
+    'published'
+  )),
+  approval_chain JSONB DEFAULT '{
+    "discovery": {"status": "pending", "by": null, "at": null},
+    "production": {"status": "pending", "by": null, "at": null},
+    "distribution": {"status": "pending", "by": null, "at": null}
+  }',
   seo_score INTEGER DEFAULT 0,
   target_keyword TEXT,
   secondary_keywords TEXT[] DEFAULT '{}',

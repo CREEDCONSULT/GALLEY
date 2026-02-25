@@ -16,7 +16,9 @@ import {
     Terminal,
     Cpu,
     Network,
-    Globe
+    Globe,
+    Target,
+    FileText
 } from "lucide-react";
 
 
@@ -86,51 +88,93 @@ export default function AutomationPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Workflow List */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold">Active Workflows</h3>
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
-                            <Activity size={14} className="animate-pulse" />
-                            3 Engines Online
+                {/* Left Column: Workflows & Approvals */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Approval Inbox Section */}
+                    <section className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-bold">Approval Inbox</h3>
+                            <span className="px-2 py-1 rounded-md bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest border border-amber-500/20">
+                                2 Actions Required
+                            </span>
                         </div>
-                    </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                                { type: 'Brief', title: 'Legal Automation for Startups', roi: '+24% Traffic Est.' },
+                                { type: 'Polish', title: 'The Future of AI Contracts', roi: 'Ready for WP' }
+                            ].map((item, i) => (
+                                <motion.div
+                                    key={i}
+                                    whileHover={{ y: -4 }}
+                                    className="glass-dark p-6 rounded-[2rem] border border-white/5 bg-gradient-to-br from-[#3B82F6]/5 to-transparent flex flex-col justify-between"
+                                >
+                                    <div>
+                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#3B82F6] mb-3">
+                                            {item.type === 'Brief' ? <Target size={12} /> : <FileText size={12} />}
+                                            {item.type} Approval
+                                        </div>
+                                        <h4 className="font-bold text-lg leading-tight mb-2">{item.title}</h4>
+                                        <span className="text-xs text-emerald-400 font-bold">{item.roi}</span>
+                                    </div>
+                                    <div className="flex gap-2 mt-6">
+                                        <button className="flex-1 h-10 rounded-xl bg-[#3B82F6] text-white text-xs font-bold hover:scale-105 transition-all">
+                                            Approve
+                                        </button>
+                                        <button className="h-10 px-4 rounded-xl bg-white/5 border border-white/5 text-xs font-bold hover:bg-white/10 transition-all">
+                                            Review
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </section>
 
-                    <div className="grid gap-4">
-                        {workflows.map((wf) => (
-                            <motion.div
-                                key={wf.id}
-                                whileHover={{ scale: 1.01 }}
-                                className="glass-dark p-6 rounded-3xl border border-white/5 group cursor-pointer relative overflow-hidden"
-                            >
-                                <div className="flex items-center justify-between relative z-10">
-                                    <div className="flex items-center gap-6">
-                                        <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${wf.status === 'Active' ? 'bg-[#3B82F6]/10 text-[#3B82F6]' : 'bg-slate-500/10 text-slate-400'
-                                            }`}>
-                                            <Cpu size={28} />
+                    {/* Workflow List */}
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-bold">Active Workflows</h3>
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
+                                <Activity size={14} className="animate-pulse" />
+                                3 Engines Online
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4">
+                            {workflows.map((wf) => (
+                                <motion.div
+                                    key={wf.id}
+                                    whileHover={{ scale: 1.01 }}
+                                    className="glass-dark p-6 rounded-3xl border border-white/5 group cursor-pointer relative overflow-hidden"
+                                >
+                                    <div className="flex items-center justify-between relative z-10">
+                                        <div className="flex items-center gap-6">
+                                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${wf.status === 'Active' ? 'bg-[#3B82F6]/10 text-[#3B82F6]' : 'bg-slate-500/10 text-slate-400'
+                                                }`}>
+                                                <Cpu size={28} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-xl font-bold group-hover:text-[#3B82F6] transition-colors">{wf.name}</h4>
+                                                <p className="text-sm text-slate-500 mt-1">{wf.description}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="text-xl font-bold group-hover:text-[#3B82F6] transition-colors">{wf.name}</h4>
-                                            <p className="text-sm text-slate-500 mt-1">{wf.description}</p>
+                                        <div className="text-right flex flex-col items-end gap-2">
+                                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${wf.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' :
+                                                wf.status === 'Scheduled' ? 'bg-[#3B82F6]/10 text-[#3B82F6]' : 'bg-slate-500/10 text-slate-400'
+                                                }`}>
+                                                {wf.status}
+                                            </span>
+                                            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                                <Clock size={12} />
+                                                Last: {wf.lastRun}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right flex flex-col items-end gap-2">
-                                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${wf.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' :
-                                            wf.status === 'Scheduled' ? 'bg-[#3B82F6]/10 text-[#3B82F6]' : 'bg-slate-500/10 text-slate-400'
-                                            }`}>
-                                            {wf.status}
-                                        </span>
-                                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                                            <Clock size={12} />
-                                            Last: {wf.lastRun}
-                                        </div>
+                                    <div className="absolute inset-y-0 right-0 w-12 flex items-center justify-center bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <ChevronRight size={20} className="text-[#3B82F6]" />
                                     </div>
-                                </div>
-                                <div className="absolute inset-y-0 right-0 w-12 flex items-center justify-center bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <ChevronRight size={20} className="text-[#3B82F6]" />
-                                </div>
-                            </motion.div>
-                        ))}
+                                </motion.div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
