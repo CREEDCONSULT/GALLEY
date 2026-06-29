@@ -3,6 +3,7 @@ import { CalendarCheck, Check, FileText, Fingerprint, Send, ShieldCheck, UserChe
 const events = [
   {
     time: "09:41",
+    kind: "Source",
     title: "Playbook selected",
     detail: "Voice, claims, exclusions, and website channel rules locked for this run.",
     actor: "System",
@@ -10,6 +11,7 @@ const events = [
   },
   {
     time: "09:42",
+    kind: "Draft",
     title: "Draft generated",
     detail: "Landing page draft created against playbook v3.",
     actor: "Galley draft placeholder",
@@ -17,6 +19,7 @@ const events = [
   },
   {
     time: "09:43",
+    kind: "Check",
     title: "Verification passed",
     detail: "Voice, claims, exclusions, and website channel rules passed verification.",
     actor: "Galley verifier placeholder",
@@ -24,6 +27,7 @@ const events = [
   },
   {
     time: "10:06",
+    kind: "Edit",
     title: "Human edited",
     detail: "Reviewer clarified the durability sentence and attached the approved source note.",
     actor: "Oliver Grant",
@@ -31,6 +35,7 @@ const events = [
   },
   {
     time: "10:08",
+    kind: "Decision",
     title: "Approved",
     detail: "Draft v2 received a recorded human approval.",
     actor: "Oliver Grant",
@@ -39,6 +44,7 @@ const events = [
   },
   {
     time: "13:00",
+    kind: "Routing",
     title: "Scheduled",
     detail: "Approved deliverable assigned to the website release window.",
     actor: "Schedule placeholder",
@@ -46,6 +52,7 @@ const events = [
   },
   {
     time: "08:00",
+    kind: "Receipt",
     title: "Published",
     detail: "Publication receipt appended to the record.",
     actor: "Publish placeholder",
@@ -63,7 +70,21 @@ export default function RecordsPage() {
         <p className="mt-4 max-w-2xl leading-7 text-muted">Every draft, check, edit, and approval stays attached to the deliverable. New events append to the history; prior events remain intact.</p>
       </header>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[0.68fr_1.32fr]">
+      <section aria-label="Record custody summary" className="mt-8 grid grid-cols-2 border-l border-t border-border lg:grid-cols-4">
+        {[
+          { label: "Source", value: "Playbook v3" },
+          { label: "Check", value: "Verifier passed" },
+          { label: "Decision", value: "Oliver Grant" },
+          { label: "Destination", value: "Website" },
+        ].map((item) => (
+          <div key={item.label} className="border-b border-r border-border bg-surface/40 p-4">
+            <p className="font-mono text-[9px] uppercase tracking-wider text-slate">{item.label}</p>
+            <p className="mt-2 text-sm font-medium text-ink-soft">{item.value}</p>
+          </div>
+        ))}
+      </section>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[0.68fr_1.32fr]">
         <aside className="h-fit border border-border bg-surface p-6">
           <div className="flex items-center justify-between border-b border-border pb-5">
             <Fingerprint size={20} className="text-primary" />
@@ -98,6 +119,7 @@ export default function RecordsPage() {
                   {index < events.length - 1 && <span className="min-h-18 w-px flex-1 bg-border" />}
                 </span>
                 <div className="pb-7">
+                  <p className="mb-1 font-mono text-[8px] uppercase tracking-[0.14em] text-primary">{event.kind}</p>
                   <h3 className="text-sm font-semibold text-ink-soft">{event.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-muted">{event.detail}</p>
                   <p className="mt-2 font-mono text-[9px] uppercase tracking-wider text-slate">Actor · {event.actor}</p>

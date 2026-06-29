@@ -4,18 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BookOpen,
-  ChevronDown,
   ClipboardCheck,
   Fingerprint,
   LayoutDashboard,
-  LogOut,
+  LockKeyhole,
   Settings,
   ShieldCheck,
 } from "lucide-react";
 
 const navigation = [
   { name: "Proof queue", href: "/dashboard/proof", icon: ClipboardCheck },
-  { name: "Client playbooks", href: "/onboarding", icon: BookOpen },
+  { name: "Playbooks", href: "/onboarding", icon: BookOpen },
   { name: "Records", href: "/dashboard/records", icon: Fingerprint },
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
 ];
@@ -56,9 +55,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard/settings" className="flex items-center gap-3 px-3 py-3 text-sm text-muted transition-colors hover:text-foreground">
             <Settings size={17} /> Settings
           </Link>
-          <button className="flex w-full items-center gap-3 px-3 py-3 text-sm text-muted transition-colors hover:text-danger">
-            <LogOut size={17} /> Sign out
-          </button>
+          <Link href="/login" className="flex w-full items-center gap-3 px-3 py-3 text-sm text-muted transition-colors hover:text-foreground">
+            <LockKeyhole size={17} /> Workspace access
+          </Link>
         </div>
       </aside>
 
@@ -69,9 +68,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="flex h-8 w-8 items-center justify-center border border-primary/70 font-mono text-xs text-primary">G</span>
               <span className="font-semibold">Galley</span>
             </Link>
-            <button className="hidden items-center gap-2 text-sm font-medium md:flex">
-              Northline Studio <ChevronDown size={14} className="text-slate" />
-            </button>
+            <div className="hidden md:block">
+              <p className="text-sm font-medium">Northline Studio</p>
+              <p className="mt-0.5 font-mono text-[8px] uppercase tracking-wider text-slate">Agency workspace</p>
+            </div>
             <div className="ml-auto flex items-center gap-3">
               <div className="hidden items-center gap-2 border border-success/30 bg-success/5 px-3 py-2 font-mono text-[9px] uppercase tracking-wider text-success sm:flex">
                 <ShieldCheck size={13} /> Human gate active

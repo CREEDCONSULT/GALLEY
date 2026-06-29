@@ -120,13 +120,13 @@ export default function OnboardingPage() {
         <div className="grid gap-10 lg:grid-cols-[0.52fr_1fr] lg:gap-18">
           <aside>
             <p className="eyebrow">New playbook</p>
-            <h1 className="editorial-display mt-5 text-5xl leading-[1.02] md:text-6xl">Give every proof run a standard.</h1>
-            <p className="mt-6 max-w-md leading-7 text-muted">
+            <h1 className="editorial-display mt-4 text-4xl leading-[1.02] md:text-5xl lg:mt-5 lg:text-6xl">Give every proof run a standard.</h1>
+            <p className="mt-4 max-w-md text-sm leading-6 text-muted lg:mt-6 lg:text-base lg:leading-7">
               Capture what the verifier and reviewer need to know before a draft reaches the desk.
             </p>
-            <ol className="mt-10 border-t border-border">
+            <ol className="mt-6 grid grid-cols-3 border-l border-t border-border lg:mt-10 lg:block lg:border-l-0">
               {chapters.map((chapter, index) => (
-                <li key={chapter} className={`flex items-center gap-4 border-b border-border py-4 ${step === index + 1 ? "text-foreground" : "text-slate"}`}>
+                <li key={chapter} className={`flex flex-col items-start gap-2 border-b border-r border-border px-2 py-3 lg:flex-row lg:items-center lg:gap-4 lg:border-r-0 lg:px-0 lg:py-4 ${step === index + 1 ? "bg-surface/50 text-foreground lg:bg-transparent" : "text-slate"}`}>
                   <span className={`flex h-7 w-7 items-center justify-center border font-mono text-[10px] ${step > index + 1 ? "border-success text-success" : step === index + 1 ? "border-primary text-primary" : "border-border"}`}>
                     {step > index + 1 ? <Check size={13} /> : `0${index + 1}`}
                   </span>
@@ -149,25 +149,38 @@ export default function OnboardingPage() {
                 {step === 2 && "The rules Galley should surface during verification."}
                 {step === 3 && "The references and outcome the account is accountable for."}
               </p>
+              <p className="mt-4 border-l border-primary pl-3 text-xs leading-5 text-ink-soft">The saved playbook becomes the source of truth for every verifier check and proof decision.</p>
             </div>
 
             {step === 1 && (
-              <div className="mt-7 grid gap-6 md:grid-cols-2">
-                <label className={labelClass}>Client account name
-                  <input className={fieldClass} value={data.client_name} onChange={(e) => update("client_name", e.target.value)} placeholder="Aster House" />
-                </label>
-                <label className={labelClass}>Website
-                  <input className={fieldClass} type="url" value={data.website} onChange={(e) => update("website", e.target.value)} placeholder="https://asterhouse.co" />
-                </label>
-                <label className={labelClass}>Industry
-                  <input className={fieldClass} value={data.industry} onChange={(e) => update("industry", e.target.value)} placeholder="Premium home goods" />
-                </label>
-                <label className={labelClass}>Target audience
-                  <input className={fieldClass} value={data.target_audience} onChange={(e) => update("target_audience", e.target.value)} placeholder="Design-conscious first-time homeowners" />
-                </label>
-                <label className={`${labelClass} md:col-span-2`}>Primary offer
-                  <textarea className={`${fieldClass} min-h-24 resize-y`} value={data.primary_offer} onChange={(e) => update("primary_offer", e.target.value)} placeholder="What is being sold, and why does it matter?" />
-                </label>
+              <div className="mt-7 space-y-8">
+                <fieldset>
+                  <legend className="font-mono text-[9px] uppercase tracking-[0.14em] text-primary">Account identity</legend>
+                  <p className="mt-2 text-xs leading-5 text-slate">Used to scope the playbook and identify the client throughout the proof record.</p>
+                  <div className="mt-4 grid gap-6 md:grid-cols-2">
+                    <label className={labelClass}>Client account name
+                      <input required className={fieldClass} value={data.client_name} onChange={(e) => update("client_name", e.target.value)} placeholder="Glow Skincare" />
+                    </label>
+                    <label className={labelClass}>Website
+                      <input required className={fieldClass} type="url" value={data.website} onChange={(e) => update("website", e.target.value)} placeholder="https://glowskincare.com" />
+                    </label>
+                    <label className={`${labelClass} md:col-span-2`}>Industry
+                      <input required className={fieldClass} value={data.industry} onChange={(e) => update("industry", e.target.value)} placeholder="Skincare and personal care" />
+                    </label>
+                  </div>
+                </fieldset>
+                <fieldset className="border-t border-border pt-7">
+                  <legend className="px-0 font-mono text-[9px] uppercase tracking-[0.14em] text-primary">Audience and offer</legend>
+                  <p className="mt-2 text-xs leading-5 text-slate">Gives reviewers the commercial context behind claims, voice, and calls to action.</p>
+                  <div className="mt-4 grid gap-6 md:grid-cols-2">
+                    <label className={labelClass}>Target audience
+                      <input required className={fieldClass} value={data.target_audience} onChange={(e) => update("target_audience", e.target.value)} placeholder="Ingredient-aware customers with sensitive skin" />
+                    </label>
+                    <label className={labelClass}>Primary offer
+                      <textarea required className={`${fieldClass} min-h-24 resize-y`} value={data.primary_offer} onChange={(e) => update("primary_offer", e.target.value)} placeholder="What is being sold, and why does it matter?" />
+                    </label>
+                  </div>
+                </fieldset>
               </div>
             )}
 
@@ -202,7 +215,7 @@ export default function OnboardingPage() {
 
             {step === 3 && (
               <div className="mt-7 space-y-6">
-                <label className={labelClass}>Competitor URLs
+                <label className={labelClass}>Competitor URLs <span className="font-normal text-slate">(optional)</span>
                   <textarea className={`${fieldClass} min-h-32 resize-y font-mono text-xs`} value={data.competitor_urls} onChange={(e) => update("competitor_urls", e.target.value)} placeholder={"https://competitor-one.com\nhttps://competitor-two.com"} />
                   <span className="mt-2 block text-xs text-slate">One URL per line. Used as context, never as source copy.</span>
                 </label>
@@ -233,6 +246,7 @@ export default function OnboardingPage() {
                 </button>
               )}
             </div>
+            {!canContinue && <p className="mt-3 text-right text-xs text-slate">Complete the required playbook fields to continue.</p>}
           </section>
         </div>
       </div>

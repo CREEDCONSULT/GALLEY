@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  CalendarClock,
   Check,
   CircleAlert,
   CircleX,
@@ -109,7 +110,7 @@ const verifierStyles = {
 };
 
 export default function ProofQueuePage() {
-  const [activeFilter, setActiveFilter] = useState<Filter>("All");
+  const [activeFilter, setActiveFilter] = useState<Filter>("Awaiting proof");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, Status>>({});
   const [notice, setNotice] = useState("");
 
@@ -132,7 +133,7 @@ export default function ProofQueuePage() {
           <div>
             <p className="eyebrow">Human approval gate</p>
             <h1 className="editorial-display mt-4 text-5xl md:text-6xl">Proof Queue</h1>
-            <p className="mt-4 max-w-2xl leading-7 text-muted">Drafts that passed verification and are awaiting human approval.</p>
+            <p className="mt-4 max-w-2xl leading-7 text-muted">Drafts checked against the client playbook. A human decision is required before anything advances.</p>
           </div>
           <div className="flex items-center gap-3 border border-success/30 bg-success/5 px-4 py-3 text-xs text-success">
             <ShieldCheck size={15} /> Nothing publishes without approval
@@ -201,14 +202,35 @@ export default function ProofQueuePage() {
 
               <div>
                 <p className="mb-1 font-mono text-[9px] uppercase tracking-wider text-slate lg:hidden">Status</p>
-                <span className={`inline-flex border px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-wider ${statusStyles[item.status]}`}>{item.status}</span>
+                <span className={`inline-flex items-center gap-1.5 border px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-wider ${statusStyles[item.status]}`}>
+                  {item.status === "Awaiting proof" && <Eye size={11} />}
+                  {item.status === "Verifying" && <Clock3 size={11} />}
+                  {item.status === "Approved" && <Check size={11} />}
+                  {item.status === "Scheduled" && <CalendarClock size={11} />}
+                  {item.status === "Rejected" && <CircleX size={11} />}
+                  {item.status}
+                </span>
               </div>
 
-              <div className="flex flex-wrap gap-2 lg:max-w-52 lg:justify-end">
-                <button type="button" onClick={() => decide(item, "Approved", "approved for the next stage")} disabled={!canApprove} className="inline-flex items-center gap-1.5 bg-foreground px-3 py-2 text-[11px] font-semibold text-background transition-colors hover:bg-primary-strong disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-slate"><Check size={13} /> Approve</button>
-                <button type="button" onClick={() => decide(item, "Awaiting proof", "edit requested")} className="inline-flex items-center gap-1.5 border border-border px-3 py-2 text-[11px] text-muted transition-colors hover:border-proof-blue/50 hover:text-foreground"><PencilLine size={13} /> Edit</button>
-                <button type="button" onClick={() => decide(item, "Rejected", "rejected by reviewer")} className="inline-flex items-center gap-1.5 border border-border px-3 py-2 text-[11px] text-muted transition-colors hover:border-danger/50 hover:text-danger"><CircleX size={13} /> Reject</button>
-                <Link href="/dashboard/records" className="inline-flex items-center gap-1.5 px-2 py-2 text-[11px] font-medium text-proof-blue hover:text-foreground"><Eye size={13} /> View record</Link>
+              <div className="lg:w-52">
+                {canApprove ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => decide(item, "Approved", "approved for the next stage")} className="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 bg-foreground px-3 py-2 text-xs font-semibold text-background transition-colors hover:bg-primary-strong"><Check size={14} /> Approve draft</button>
+                    <button type="button" onClick={() => decide(item, "Awaiting proof", "edit requested")} className="inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] text-muted transition-colors hover:border-proof-blue/50 hover:text-foreground"><PencilLine size={13} /> Edit</button>
+                    <button type="button" onClick={() => decide(item, "Rejected", "rejected by reviewer")} className="inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] text-muted transition-colors hover:border-danger/50 hover:text-danger"><CircleX size={13} /> Reject</button>
+                    <Link href="/dashboard/records" className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] font-medium text-proof-blue transition-colors hover:border-proof-blue/50 hover:text-foreground"><Eye size={13} /> View record</Link>
+                  </div>
+                ) : (
+                  <div className="border-l border-border pl-4 lg:text-right">
+                    <p className="text-xs leading-5 text-slate">
+                      {item.status === "Verifying" && "Verification must finish before proof."}
+                      {item.status === "Approved" && "Human decision recorded."}
+                      {item.status === "Scheduled" && "Cleared by proof and queued in the prototype."}
+                      {item.status === "Rejected" && "Stopped by a recorded reviewer decision."}
+                    </p>
+                    <Link href="/dashboard/records" className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-proof-blue hover:text-foreground"><Eye size={13} /> View record</Link>
+                  </div>
+                )}
               </div>
             </article>
           );
