@@ -8,8 +8,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ContentFlow AI | Rank Higher While You Sleep",
-  description: "Automated SEO-optimized content for blogs and social media.",
+  title: "Galley | Proof before press.",
+  description: "The supervised content-ops agent for agencies and DTC teams.",
 };
 
 export default function RootLayout({

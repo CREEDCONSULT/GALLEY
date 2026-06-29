@@ -1,353 +1,276 @@
-"use client";
-
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import {
   ArrowRight,
-  Bot,
-  Zap,
-  TrendingUp,
-  ShieldCheck,
-  BarChart3,
-  PenTool,
-  Globe,
   Check,
-  FileText,
-  Search,
-  CheckCircle2,
-  Sparkles
+  CircleAlert,
+  Eye,
+  Fingerprint,
+  ShieldCheck,
 } from "lucide-react";
-import Link from "next/link";
+
+const workflow = [
+  { name: "Produce", description: "Drafts start from the client playbook." },
+  { name: "Verify", description: "Voice, claims, and brand safety are checked." },
+  { name: "Proof", description: "A human approves, edits, or rejects." },
+  { name: "Schedule", description: "Approved work moves to its channel." },
+  { name: "Report", description: "Production and performance form the memo." },
+];
+
+const trustItems = [
+  {
+    number: "01",
+    title: "Verifier",
+    description: "Every draft is checked against the active client playbook before review.",
+    icon: ShieldCheck,
+  },
+  {
+    number: "02",
+    title: "Human gate",
+    description: "Nothing moves forward without a recorded decision from a named reviewer.",
+    icon: Eye,
+  },
+  {
+    number: "03",
+    title: "Recorded custody",
+    description: "Every draft, edit, approval, and publish is preserved in the deliverable record.",
+    icon: Fingerprint,
+  },
+];
+
+const recordEvents = [
+  { time: "09:41", event: "Playbook v3 selected", actor: "System" },
+  { time: "09:42", event: "Draft v1 created", actor: "Galley" },
+  { time: "09:42", event: "Verification completed with 1 note", actor: "Verifier" },
+  { time: "10:06", event: "Source note added", actor: "O. Grant" },
+  { time: "10:08", event: "Draft v2 approved", actor: "O. Grant" },
+];
+
+function Mark() {
+  return (
+    <span className="flex items-center gap-3">
+      <span className="flex h-9 w-9 items-center justify-center border border-primary/70 font-mono text-sm text-primary">G</span>
+      <span className="text-lg font-semibold tracking-[-0.02em]">Galley</span>
+    </span>
+  );
+}
 
 export default function Home() {
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">("monthly");
-
-  const features = [
-    {
-      icon: <Search className="text-[#3B82F6]" />,
-      title: "Self-Driving Research",
-      description: "Our AI agent crawls your site and competitors to find high-intent keyword gaps automatically."
-    },
-    {
-      icon: <PenTool className="text-emerald-400" />,
-      title: "Brand Voice Cloning",
-      description: "We analyze your top-performing posts to replicate your unique tone, sentence structure, and vocabulary."
-    },
-    {
-      icon: <Globe className="text-[#3B82F6]" />,
-      title: "Direct WP Sync",
-      description: "Approve content in one click and watch it publish directly to your WordPress site with SEO metadata."
-    },
-    {
-      icon: <BarChart3 className="text-emerald-400" />,
-      title: "GSC Health Pulse",
-      description: "Real-time tracking of impressions and clicks for every asset we publish for you."
-    }
-  ];
-
-  const plans = [
-    {
-      name: "Starter",
-      description: "Perfect for local service businesses.",
-      monthlyPrice: 99,
-      annualPrice: 79,
-      features: ["4 Articles / Month", "Keyword Research", "WP Integration", "Basic Analytics"],
-      cta: "Start Free Trial",
-      popular: false
-    },
-    {
-      name: "Growth",
-      description: "The sweet spot for scaling SaaS.",
-      monthlyPrice: 199,
-      annualPrice: 159,
-      features: ["12 Articles / Month", "Priority Research", "Brand Voice Cloning", "SEO scoring"],
-      cta: "Get Started",
-      popular: true
-    },
-    {
-      name: "Agency",
-      description: "Volume for competitive industries.",
-      monthlyPrice: 499,
-      annualPrice: 399,
-      features: ["30 Articles / Month", "Strategic Advisory", "Custom Workflows", "White-label reports"],
-      cta: "Contact Sales",
-      popular: false
-    }
-  ];
-
   return (
-    <div className="flex min-h-screen flex-col bg-[#0B1120] text-foreground overflow-x-hidden">
-      {/* Navigation */}
-      <nav className="fixed top-0 z-50 w-full glass border-b border-white/5 px-6 py-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3B82F6] shadow-lg shadow-[#3B82F6]/20 group-hover:scale-110 transition-transform">
-              <Bot className="text-white" size={24} />
-            </div>
-            <span className="text-xl font-bold tracking-tight">ContentFlow <span className="text-[#3B82F6] italic">AI</span></span>
-          </Link>
-          <div className="hidden items-center gap-8 md:flex">
-            <a href="#features" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Features</a>
-            <a href="#samples" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Samples</a>
-            <a href="#pricing" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Pricing</a>
+    <div className="min-h-screen overflow-hidden bg-background text-foreground">
+      <nav className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 px-5 backdrop-blur-sm md:px-10">
+        <div className="mx-auto flex h-18 max-w-7xl items-center justify-between">
+          <Link href="/" aria-label="Galley home"><Mark /></Link>
+          <div className="hidden items-center gap-8 text-sm text-muted md:flex">
+            <a href="#product" className="transition-colors hover:text-foreground">Product</a>
+            <a href="#workflow" className="transition-colors hover:text-foreground">Workflow</a>
+            <a href="#security" className="transition-colors hover:text-foreground">Security</a>
+            <a href="#record" className="transition-colors hover:text-foreground">Records</a>
           </div>
-          <Link
-            href="/onboarding"
-            className="rounded-full bg-[#3B82F6] px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-[#3B82F6]/20 hover:scale-105 active:scale-95 transition-all"
-          >
-            Get Started
+          <Link href="/onboarding" className="border border-primary bg-primary px-4 py-2.5 text-sm font-semibold text-background transition-colors hover:bg-primary-strong">
+            Start a proof run
           </Link>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <main className="relative flex flex-col items-center">
-        <section className="relative flex min-h-[90vh] flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
-          {/* Animated Background Orbs */}
-          <div className="absolute top-1/4 left-1/4 h-64 w-64 rounded-full bg-[#3B82F6]/20 blur-[128px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-emerald-500/10 blur-[128px]" />
-
-          <div className="z-10 mx-auto max-w-4xl">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/20 bg-[#3B82F6]/5 px-4 py-1.5 text-sm font-medium text-[#3B82F6]"
-            >
-              <Zap size={14} className="fill-current" />
-              <span>Powering 500+ Organic Strategies</span>
-            </motion.div>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-8 text-5xl font-black tracking-tighter sm:text-7xl lg:text-8xl"
-            >
-              Rank Higher <br />
-              <span className="bg-gradient-to-r from-[#3B82F6] via-emerald-400 to-[#3B82F6] bg-[length:200%_auto] bg-clip-text text-transparent animate-gradient">
-                While You Sleep
-              </span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="mx-auto mb-12 max-w-2xl text-lg text-slate-400 sm:text-xl lg:text-2xl"
-            >
-              The automated SEO engine that researches, writes, and publishes
-              high-authority content in your unique brand voice.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="flex flex-col items-center justify-center gap-4 sm:flex-row"
-            >
-              <Link
-                href="/onboarding"
-                className="group flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-[#3B82F6] px-10 text-lg font-bold text-white shadow-xl shadow-[#3B82F6]/30 hover:scale-[1.02] active:scale-[0.98] transition-all sm:w-auto"
-              >
-                Start Free Audit
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <a
-                href="#samples"
-                className="h-16 w-full flex items-center justify-center rounded-2xl glass-dark px-10 text-lg font-semibold border border-white/5 hover:border-[#3B82F6]/40 transition-all sm:w-auto"
-              >
-                View Sample Assets
-              </a>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section id="features" className="w-full max-w-7xl px-6 py-32">
-          <div className="text-center mb-20">
-            <h2 className="text-3xl font-black mb-4 sm:text-5xl">Automate Your <span className="text-[#3B82F6]">SEO Moat</span></h2>
-            <p className="text-slate-500 max-w-xl mx-auto italic font-medium">Zero-prompt content production for aggressive growth.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="glass-dark p-8 rounded-[2rem] border border-white/5 hover:border-[#3B82F6]/30 transition-all group"
-              >
-                <div className="h-14 w-14 rounded-2xl bg-white/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  {feature.icon}
-                </div>
-                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{feature.description}</p>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* Sample Assets Section */}
-        <section id="samples" className="w-full bg-white/[0.02] py-32 px-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col lg:flex-row gap-16 items-center">
-              <div className="lg:w-1/2 space-y-8">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-widest">
-                  <Sparkles size={12} />
-                  Live Samples
-                </div>
-                <h2 className="text-4xl sm:text-6xl font-black leading-tight">Content that looks and <span className="text-[#3B82F6] italic">feels</span> human.</h2>
-                <p className="text-slate-400 text-lg leading-relaxed">
-                  Our Forge AI doesn't just generate text. It constructs deep-dive assets with H-tags, meta-data, and semantic density that search engines adore.
-                </p>
-                <div className="space-y-4">
-                  {[
-                    "80+ Avg Performance Score",
-                    "Plagiarism-free guaranteed",
-                    "Synthesized from your brand DNA"
-                  ].map((text, i) => (
-                    <div key={i} className="flex items-center gap-3 font-bold text-sm">
-                      <div className="h-5 w-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                        <Check size={12} />
-                      </div>
-                      {text}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="lg:w-1/2 w-full">
-                <div className="glass-dark rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
-                  <div className="h-12 border-b border-white/10 bg-white/5 flex items-center px-6 gap-2">
-                    <div className="h-3 w-3 rounded-full bg-rose-500" />
-                    <div className="h-3 w-3 rounded-full bg-amber-500" />
-                    <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                  </div>
-                  <div className="p-8 space-y-6">
-                    <div className="h-4 w-1/3 bg-[#3B82F6]/20 rounded-full" />
-                    <div className="h-10 w-full bg-white/5 rounded-xl" />
-                    <div className="space-y-3">
-                      <div className="h-4 w-full bg-white/5 rounded-full" />
-                      <div className="h-4 w-full bg-white/5 rounded-full" />
-                      <div className="h-4 w-2/3 bg-white/5 rounded-full" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="h-32 rounded-2xl bg-white/5 border border-white/5" />
-                      <div className="h-32 rounded-2xl bg-white/5 border border-white/5" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Pricing Section */}
-        <section id="pricing" className="w-full max-w-7xl px-6 py-32">
-          <div className="text-center mb-20">
-            <h2 className="text-3xl font-black mb-6 sm:text-5xl">Scale Your <span className="text-[#3B82F6]">Velocity</span></h2>
-
-            {/* Billing Toggle */}
-            <div className="flex items-center justify-center gap-4">
-              <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-slate-500'}`}>Monthly</span>
-              <button
-                onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annually' : 'monthly')}
-                className="h-8 w-14 rounded-full bg-white/5 border border-white/10 p-1 relative"
-              >
-                <div className={`h-full aspect-square bg-[#3B82F6] rounded-full transition-all duration-300 ${billingCycle === 'annually' ? 'ml-6' : 'ml-0'}`} />
-              </button>
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-bold ${billingCycle === 'annually' ? 'text-white' : 'text-slate-500'}`}>Annually</span>
-                <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-md border border-emerald-500/20 uppercase tracking-tighter">Save 20%</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {plans.map((plan, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                className={`
-                  glass-dark p-8 rounded-[2.5rem] border relative flex flex-col
-                  ${plan.popular ? 'border-[#3B82F6] shadow-2xl shadow-[#3B82F6]/10' : 'border-white/5'}
-                `}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#3B82F6] text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
-                    Most Popular
-                  </div>
-                )}
-
-                <h3 className="text-2xl font-black mb-2">{plan.name}</h3>
-                <p className="text-sm text-slate-500 mb-8">{plan.description}</p>
-
-                <div className="flex items-baseline gap-1 mb-10">
-                  <span className="text-5xl font-black">${billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice}</span>
-                  <span className="text-slate-500 font-bold">/mo</span>
-                </div>
-
-                <div className="space-y-4 mb-10 flex-1">
-                  {plan.features.map((feat, j) => (
-                    <div key={j} className="flex items-center gap-3 text-sm font-medium">
-                      <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-                      {feat}
-                    </div>
-                  ))}
-                </div>
-
-                <Link
-                  href="/onboarding"
-                  className={`
-                    w-full py-4 rounded-2xl text-center font-black tracking-widest uppercase transition-all
-                    ${plan.popular ? 'bg-[#3B82F6] text-white shadow-xl shadow-[#3B82F6]/20' : 'bg-white text-black hover:bg-slate-100'}
-                  `}
-                >
-                  {plan.cta}
+      <main>
+        <section id="product" className="rule-grid relative border-b border-border px-5 pb-20 pt-36 md:px-10 md:pb-28 md:pt-48">
+          <div className="mx-auto grid max-w-7xl gap-16 lg:grid-cols-[1.12fr_0.88fr] lg:items-end">
+            <div>
+              <p className="eyebrow mb-7">Supervised content operations</p>
+              <h1 className="editorial-display max-w-4xl text-[4rem] leading-[0.92] text-foreground sm:text-8xl lg:text-[7.2rem]">Proof before press.</h1>
+              <p className="mt-8 max-w-2xl text-base leading-7 text-muted md:text-lg">
+                Galley is the supervised content-operations agent for agencies and DTC teams. It produces, verifies, queues, schedules, and reports client content — with a human at the gate and a record of every move.
+              </p>
+              <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+                <Link href="/onboarding" className="group inline-flex h-13 items-center justify-center gap-3 bg-primary px-6 font-semibold text-background transition-colors hover:bg-primary-strong">
+                  Start a proof run <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" />
                 </Link>
-              </motion.div>
-            ))}
+                <a href="#workflow" className="inline-flex h-13 items-center justify-center border border-border-strong px-6 font-semibold text-ink-soft transition-colors hover:border-proof-blue hover:text-foreground">
+                  View the workflow
+                </a>
+              </div>
+            </div>
+
+            <div className="border border-border bg-surface p-5 shadow-[14px_14px_0_0_#030302] md:p-7">
+              <div className="flex items-center justify-between border-b border-border pb-4">
+                <div>
+                  <p className="eyebrow">Proof run / 0142</p>
+                  <h2 className="mt-2 font-semibold">Aster House · Landing page</h2>
+                </div>
+                <span className="border border-status-awaiting-proof/40 bg-status-awaiting-proof/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-status-awaiting-proof">Awaiting proof</span>
+              </div>
+              <div className="py-5">
+                <p className="font-mono text-[9px] uppercase tracking-wider text-slate">Draft excerpt</p>
+                <blockquote className="editorial-display mt-3 text-2xl leading-8 text-ink-soft">“A room should feel collected, not completed.”</blockquote>
+              </div>
+              <div className="space-y-3 border-y border-border py-5">
+                {["Voice aligned to playbook v3", "Approved claims matched", "One source needs review"].map((item, index) => (
+                  <div key={item} className="flex items-center gap-3 text-sm text-ink-soft">
+                    <span className={`flex h-5 w-5 items-center justify-center border ${index === 2 ? "border-warning/60 text-warning" : "border-success/60 text-success"}`}>
+                      {index === 2 ? "!" : <Check size={12} />}
+                    </span>
+                    {item}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-5 text-center font-mono text-[9px] uppercase tracking-wider">
+                <span className="border border-border px-2 py-3 text-muted">Reject draft</span>
+                <span className="border border-border px-2 py-3 text-muted">Edit draft</span>
+                <span className="bg-foreground px-2 py-3 text-background">Approve draft</span>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-slate">Nothing publishes without a recorded human yes.</p>
+            </div>
           </div>
         </section>
 
-        {/* Final CTA */}
-        <section className="w-full max-w-5xl mx-auto px-6 py-32">
-          <div className="glass-dark p-12 sm:p-20 rounded-[3rem] border border-[#3B82F6]/20 bg-gradient-to-br from-[#3B82F6]/10 to-transparent text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-10 opacity-10">
-              <Bot size={200} />
+        <section className="border-b border-border bg-[#050504] px-5 py-7 md:px-10">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-slate sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-mono uppercase tracking-[0.14em] text-muted">Built for teams where review is part of the work</p>
+            <div className="flex flex-wrap gap-x-8 gap-y-2 font-medium text-ink-soft">
+              <span>Agency operations</span><span>DTC content</span><span>Client services</span>
             </div>
-            <h2 className="text-4xl sm:text-6xl font-black mb-8 leading-tight">Ready to let AI handle <br /> the heavy lifting?</h2>
-            <Link
-              href="/onboarding"
-              className="inline-flex h-16 items-center justify-center gap-3 rounded-2xl bg-[#3B82F6] px-12 text-lg font-bold text-white shadow-2xl shadow-[#3B82F6]/30 hover:scale-[1.05] active:scale-95 transition-all"
-            >
-              Get Started for Free
-              <ArrowRight size={20} />
-            </Link>
-            <p className="mt-8 text-slate-500 font-medium">No credit card required for audit. 14-day free trial.</p>
+          </div>
+        </section>
+
+        <section id="workflow" className="border-b border-border px-5 py-20 md:px-10 md:py-28">
+          <div className="mx-auto max-w-7xl">
+            <div className="grid gap-10 md:grid-cols-[0.7fr_1.3fr]">
+              <div>
+                <p className="eyebrow">The operating loop</p>
+                <h2 className="editorial-display mt-5 text-4xl leading-tight md:text-6xl">One route from playbook to report.</h2>
+              </div>
+              <p className="max-w-2xl text-lg leading-8 text-muted md:justify-self-end">
+                Every stage has an owner. Every handoff has a state. V1 centers the validation node: verify, proof, and record.
+              </p>
+            </div>
+            <ol className="mt-16 grid border-l border-t border-border sm:grid-cols-5">
+              {workflow.map((item, index) => (
+                <li key={item.name} className={`relative min-h-52 border-b border-r border-border p-5 ${item.name === "Proof" ? "bg-surface-raised" : "bg-surface/30"}`}>
+                  <span className="font-mono text-[10px] text-slate">0{index + 1}</span>
+                  <h3 className="mt-10 text-lg font-semibold">{item.name}</h3>
+                  <p className="mt-3 text-sm leading-6 text-muted">{item.description}</p>
+                  {item.name === "Proof" && <span className="absolute inset-x-0 bottom-0 h-px bg-primary" />}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section className="border-b border-border bg-[#050504] px-5 py-20 md:px-10 md:py-28">
+          <div className="mx-auto max-w-7xl">
+            <div className="grid gap-10 lg:grid-cols-[0.75fr_1.25fr] lg:items-end">
+              <div>
+                <p className="eyebrow">The proof queue is the product</p>
+                <h2 className="editorial-display mt-5 text-5xl leading-[1.02] md:text-7xl">Review the exception. Keep the context.</h2>
+              </div>
+              <p className="max-w-2xl text-lg leading-8 text-muted lg:justify-self-end">Draft, verifier evidence, playbook version, and decision controls belong on one surface. No prompt archaeology. No approval in chat.</p>
+            </div>
+
+            <div className="mt-14 border border-border bg-surface shadow-[16px_16px_0_0_#000]">
+              <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-slate">GLY-0142 · Aster House</p>
+                  <h3 className="mt-2 text-lg font-semibold">Spring collection landing page</h3>
+                </div>
+                <span className="w-fit border border-warning/40 bg-warning/5 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-wider text-warning">Verifier · 1 note</span>
+              </div>
+              <div className="grid lg:grid-cols-2">
+                <div className="border-b border-border p-6 lg:border-b-0 lg:border-r lg:p-9">
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-slate">Draft v1 · Website</p>
+                  <blockquote className="editorial-display mt-5 max-w-xl text-3xl leading-10 text-ink-soft">“A room should feel collected, not completed. The Aster system evolves with the rituals that make a home yours.”</blockquote>
+                </div>
+                <div className="p-6 lg:p-9">
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-slate">Verifier notes · Playbook v3</p>
+                  <div className="mt-5 flex gap-3 border border-warning/30 bg-warning/5 p-4 text-sm leading-6 text-ink-soft">
+                    <CircleAlert size={16} className="mt-1 shrink-0 text-warning" />
+                    “Evolves with” implies durability. Add the approved source note before approval.
+                  </div>
+                  <div className="mt-6 grid grid-cols-3 gap-2 text-xs">
+                    <span className="border border-border px-3 py-3 text-center text-muted">Reject draft</span>
+                    <span className="border border-border px-3 py-3 text-center text-muted">Edit draft</span>
+                    <span className="bg-foreground px-3 py-3 text-center font-semibold text-background">Approve draft</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="record" className="border-b border-border px-5 py-20 md:px-10 md:py-28">
+          <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[0.75fr_1.25fr]">
+            <div>
+              <p className="eyebrow">The record is the trust artifact</p>
+              <h2 className="editorial-display mt-5 text-5xl leading-[1.03] md:text-7xl">A chain of custody for every asset.</h2>
+              <p className="mt-7 max-w-lg text-lg leading-8 text-muted">Every draft, check, edit, and approval stays retrievable. Corrections append to the history; they do not rewrite it.</p>
+              <Link href="/dashboard/proof" className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-proof-blue hover:text-foreground">View a proof record <ArrowRight size={15} /></Link>
+            </div>
+            <div className="border border-border bg-surface p-6 md:p-8">
+              <div className="flex items-center justify-between border-b border-border pb-5">
+                <div><p className="font-semibold">Record GLY-0142-R02</p><p className="mt-1 text-xs text-slate">Aster House · Draft v2</p></div>
+                <Fingerprint size={20} className="text-primary" />
+              </div>
+              <ol className="mt-6">
+                {recordEvents.map((item, index) => (
+                  <li key={item.event} className="grid grid-cols-[3.5rem_1.25rem_1fr] gap-3">
+                    <span className="pt-0.5 font-mono text-[9px] text-slate">{item.time}</span>
+                    <span className="flex flex-col items-center"><span className={`mt-0.5 h-2.5 w-2.5 border ${index === recordEvents.length - 1 ? "border-success bg-success" : "border-primary"}`} />{index < recordEvents.length - 1 && <span className="h-14 w-px bg-border" />}</span>
+                    <div><p className="text-sm font-medium text-ink-soft">{item.event}</p><p className="mt-1 text-xs text-slate">{item.actor}</p></div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </section>
+
+        <section id="security" className="border-b border-border bg-[#050504] px-5 py-20 md:px-10 md:py-28">
+          <div className="mx-auto max-w-7xl">
+            <p className="eyebrow">Security and control</p>
+            <div className="mt-5 grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+              <h2 className="editorial-display text-5xl leading-tight md:text-7xl">Trust is a visible system state.</h2>
+              <p className="max-w-2xl text-lg leading-8 text-muted lg:justify-self-end">Galley shows what generated the draft, what checked it, what failed, who approved it, and where it is allowed to go.</p>
+            </div>
+            <div className="mt-16 grid border-l border-t border-border md:grid-cols-3">
+              {trustItems.map((item) => (
+                <article key={item.title} className="border-b border-r border-border p-7 md:min-h-72 md:p-9">
+                  <div className="flex items-center justify-between text-primary"><item.icon size={22} strokeWidth={1.5} /><span className="font-mono text-xs">{item.number}</span></div>
+                  <h3 className="mt-16 text-xl font-semibold">{item.title}</h3>
+                  <p className="mt-4 max-w-sm leading-7 text-muted">{item.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-b border-border px-5 py-20 md:px-10 md:py-28">
+          <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-2 lg:items-center">
+            <div>
+              <p className="eyebrow">Agency economics</p>
+              <h2 className="editorial-display mt-6 text-5xl leading-[1.02] md:text-7xl">More account capacity. Fewer execution leaks.</h2>
+            </div>
+            <div className="border-l border-border-strong pl-7 md:pl-10">
+              <p className="text-xl leading-9 text-ink-soft">Each client playbook carries the voice, claims, exclusions, channels, and KPI into review. Managers can hold more client accounts with fewer execution leaks and cleaner reporting.</p>
+              <ul className="mt-8 space-y-4 text-sm text-muted">
+                {["Proof-ready drafts queued for approval", "One place to approve, edit, or reject", "A client-safe record instead of excuses"].map((item) => <li key={item} className="flex items-center gap-3"><Check size={15} className="text-primary" />{item}</li>)}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="pricing" className="px-5 py-20 md:px-10 md:py-28">
+          <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-10 border border-border bg-surface p-8 md:flex-row md:items-end md:p-14">
+            <div>
+              <p className="eyebrow">Design partner onboarding</p>
+              <h2 className="editorial-display mt-5 max-w-3xl text-4xl leading-tight md:text-6xl">Content operations, with proof built in.</h2>
+              <p className="mt-5 max-w-2xl leading-7 text-muted">Start with one client playbook and one proof run. No autonomous publishing. No hidden handoffs.</p>
+            </div>
+            <Link href="/onboarding" className="group inline-flex shrink-0 items-center gap-3 bg-primary px-6 py-4 font-semibold text-background hover:bg-primary-strong">Start a proof run <ArrowRight size={17} className="transition-transform group-hover:translate-x-1" /></Link>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-12 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3B82F6]/10 text-[#3B82F6] group-hover:scale-110 transition-transform">
-              <Bot size={18} />
-            </div>
-            <span className="font-bold tracking-tight">ContentFlow AI</span>
-          </Link>
-          <div className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-            © 2026 ContentFlow AI. All rights Reserved.
-          </div>
-          <div className="flex gap-6 text-sm font-bold text-slate-400 hover:text-white transition-colors">
-            <Link href="#">Terms</Link>
-            <Link href="#">Privacy</Link>
-          </div>
+      <footer className="border-t border-border px-5 py-8 md:px-10">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 text-sm text-slate sm:flex-row sm:items-center sm:justify-between">
+          <Link href="/"><Mark /></Link><p>Content operations without the chaos.</p><p>© 2026 Galley</p>
         </div>
       </footer>
     </div>

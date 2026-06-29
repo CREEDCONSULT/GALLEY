@@ -1,47 +1,136 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0F172A;
-  --foreground: #F8FAFC;
-  --primary: #3B82F6;
-  --success: #10B981;
-  --warning: #F59E0B;
-  --danger: #EF4444;
-  --surface: #1E293B;
-  --slate: #64748B;
+  --galley-ink: #080807;
+  --galley-charcoal: #171615;
+  --galley-graphite: #2b2926;
+  --galley-bone: #e8dfd1;
+  --galley-paper: #f7f3ea;
+  --galley-brass: #b89b5e;
+  --galley-blue: #2f6bff;
+  --galley-red: #d94a38;
+  --galley-green: #4d8b5a;
+  --galley-yellow: #e7c86a;
+
+  --background: var(--galley-ink);
+  --foreground: var(--galley-paper);
+  --primary: var(--galley-brass);
+  --primary-strong: #c9ad70;
+  --success: var(--galley-green);
+  --warning: var(--galley-yellow);
+  --danger: var(--galley-red);
+  --surface: var(--galley-charcoal);
+  --surface-raised: #1d1b19;
+  --surface-muted: var(--galley-graphite);
+  --slate: #8b8378;
+  --muted: #aaa397;
+  --border: var(--galley-graphite);
+  --border-strong: #4a4641;
+  --ink-soft: var(--galley-bone);
+
+  --status-drafting: #8b8378;
+  --status-verifying: var(--galley-blue);
+  --status-awaiting-proof: var(--galley-yellow);
+  --status-approved: var(--galley-green);
+  --status-scheduled: var(--galley-brass);
+  --status-published: var(--galley-green);
+  --status-rejected: var(--galley-red);
+  --status-escalated: var(--galley-red);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-proof-blue: var(--galley-blue);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-muted: var(--surface-muted);
   --color-slate: var(--slate);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink-soft: var(--ink-soft);
+  --color-status-drafting: var(--status-drafting);
+  --color-status-verifying: var(--status-verifying);
+  --color-status-awaiting-proof: var(--status-awaiting-proof);
+  --color-status-approved: var(--status-approved);
+  --color-status-scheduled: var(--status-scheduled);
+  --color-status-published: var(--status-published);
+  --color-status-rejected: var(--status-rejected);
+  --color-status-escalated: var(--status-escalated);
   --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 }
 
 @utility glass {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface);
+  border: 1px solid var(--border);
 }
 
 @utility glass-dark {
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+  scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100vh;
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  font-feature-settings: "ss01" 1, "cv02" 1;
   cursor: default;
-  /* Ensure default cursor on the whole app */
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--background);
+}
+
+.editorial-display {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  letter-spacing: -0.045em;
+}
+
+.eyebrow {
+  color: var(--primary-strong);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.rule-grid {
+  background-image:
+    linear-gradient(to right, rgba(215, 208, 192, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(215, 208, 192, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.focus-ring:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--primary-strong);
+  outline-offset: 3px;
 }
 
 /* Ensure only actual inputs show the text cursor */
@@ -57,15 +146,4 @@ button,
 [role="button"],
 select {
   cursor: pointer !important;
-}
-
-/* Prevent text selection cursor from "popping" on decorative text */
-h1,
-h2,
-h3,
-h4,
-span,
-p,
-div {
-  cursor: inherit;
 }

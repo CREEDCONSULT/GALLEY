@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export async function createClient() {
@@ -7,7 +7,7 @@ export async function createClient() {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     if (!url || !key) {
-        return {} as any
+        throw new Error('Supabase server configuration is unavailable')
     }
 
 
