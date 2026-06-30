@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "validate:galley": "node --experimental-strip-types scripts/validate-galley-node.mjs",
-    "validate:galley:persistence": "node --experimental-strip-types scripts/validate-galley-persistence.mjs"
+    "validate:galley:persistence": "node --experimental-strip-types scripts/validate-galley-persistence.mjs",
+    "smoke:galley:supabase": "node scripts/smoke-galley-supabase.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

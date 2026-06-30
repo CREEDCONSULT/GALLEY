@@ -20,6 +20,7 @@ import type {
 } from "./types";
 
 type Row = Record<string, unknown>;
+type SupabaseError = { message: string; code?: string; details?: string | null; hint?: string | null };
 
 export type ClientAccountInput = {
   name: string;
@@ -216,11 +217,24 @@ function mapEvent(row: Row): Event {
   };
 }
 
-function fail(context: string, error: { message: string } | null): never {
-  throw new Error(`${context}: ${error?.message ?? "Unknown Supabase error"}`);
+function fail(context: string, error: SupabaseError | null): never {
+  const message = error?.message ?? "Supabase returned no data and no diagnostic.";
+  const rlsBlocked = error?.code === "42501" || /row.level security|permission denied/i.test(message);
+  if (rlsBlocked) {
+    throw new Error(`${context}: blocked by Supabase Row Level Security. Confirm the user owns this tenant and all Galley migrations are applied. ${message}`);
+  }
+  const detail = [error?.code && `code ${error.code}`, error?.details, error?.hint].filter(Boolean).join("; ");
+  throw new Error(`${context}: ${message}${detail ? ` (${detail})` : ""}`);
+}
+
+function missing(entity: string, id: string): never {
+  throw new Error(`${entity} not found or is not visible to the authenticated tenant: ${id}`);
 }
 
 async function authenticatedContext() {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local, then restart Galley.");
+  }
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) fail("Authentication required", error);
@@ -246,7 +260,7 @@ export async function getOrCreateDefaultTenant(): Promise<Tenant> {
     .select("*")
     .eq("owner_user_id", user.id)
     .maybeSingle();
-  if (existing.error) fail("Unable to load default tenant", existing.error);
+  if (existing.error) fail("Failed to select the authenticated user's default tenant", existing.error);
   if (existing.data) return mapTenant(existing.data);
 
   const created = await supabase
@@ -257,7 +271,7 @@ export async function getOrCreateDefaultTenant(): Promise<Tenant> {
     })
     .select("*")
     .single();
-  if (created.error || !created.data) fail("Unable to create default tenant", created.error);
+  if (created.error || !created.data) fail("Failed to insert a default tenant", created.error);
   return mapTenant(created.data);
 }
 
@@ -277,7 +291,7 @@ export async function createClientAccount(input: ClientAccountInput): Promise<Cl
     })
     .select("*")
     .single();
-  if (result.error || !result.data) fail("Unable to create client account", result.error);
+  if (result.error || !result.data) fail("Failed to insert client account", result.error);
   return mapClientAccount(result.data);
 }
 
@@ -289,12 +303,14 @@ export async function listClientAccounts(): Promise<ClientAccount[]> {
     .select("*")
     .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: true });
-  if (result.error) fail("Unable to list client accounts", result.error);
+  if (result.error) fail("Failed to select client accounts", result.error);
   return (result.data ?? []).map(mapClientAccount);
 }
 
 export async function createPlaybook(input: PlaybookInput): Promise<Playbook> {
   const tenant = await getOrCreateDefaultTenant();
+  const account = await getAccount(input.accountId);
+  if (account.tenantId !== tenant.id) missing("Client account", input.accountId);
   const { supabase } = await authenticatedContext();
   const result = await supabase
     .from("playbooks")
@@ -310,7 +326,7 @@ export async function createPlaybook(input: PlaybookInput): Promise<Playbook> {
     })
     .select("*")
     .single();
-  if (result.error || !result.data) fail("Unable to create playbook", result.error);
+  if (result.error || !result.data) fail("Failed to insert playbook", result.error);
   return mapPlaybook(result.data);
 }
 
@@ -323,12 +339,14 @@ export async function getLatestPlaybook(accountId: string): Promise<Playbook | n
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (result.error) fail("Unable to load latest playbook", result.error);
+  if (result.error) fail("Failed to select latest playbook", result.error);
   return result.data ? mapPlaybook(result.data) : null;
 }
 
 export async function createDeliverable(input: DeliverableInput): Promise<Deliverable> {
   const tenant = await getOrCreateDefaultTenant();
+  const account = await getAccount(input.accountId);
+  if (account.tenantId !== tenant.id) missing("Client account", input.accountId);
   const { supabase } = await authenticatedContext();
   const result = await supabase
     .from("deliverables")
@@ -343,7 +361,7 @@ export async function createDeliverable(input: DeliverableInput): Promise<Delive
     })
     .select("*")
     .single();
-  if (result.error || !result.data) fail("Unable to create deliverable", result.error);
+  if (result.error || !result.data) fail("Failed to insert deliverable", result.error);
   return mapDeliverable(result.data);
 }
 
@@ -360,7 +378,7 @@ export async function listDeliverables(filters: DeliverableFilters = {}): Promis
   if (Array.isArray(filters.status)) query = query.in("status", filters.status);
   else if (filters.status) query = query.eq("status", filters.status);
   const result = await query;
-  if (result.error) fail("Unable to list deliverables", result.error);
+  if (result.error) fail("Failed to select deliverables", result.error);
   return (result.data ?? []).map(mapDeliverable);
 }
 
@@ -370,9 +388,18 @@ async function getDeliverable(deliverableId: string): Promise<Deliverable> {
     .from("deliverables")
     .select("*")
     .eq("id", deliverableId)
-    .single();
-  if (result.error || !result.data) fail("Unable to load deliverable", result.error);
+    .maybeSingle();
+  if (result.error) fail("Failed to select deliverable", result.error);
+  if (!result.data) missing("Deliverable", deliverableId);
   return mapDeliverable(result.data);
+}
+
+async function getAccount(accountId: string): Promise<ClientAccount> {
+  const { supabase } = await authenticatedContext();
+  const result = await supabase.from("client_accounts").select("*").eq("id", accountId).maybeSingle();
+  if (result.error) fail("Failed to select client account", result.error);
+  if (!result.data) missing("Client account", accountId);
+  return mapClientAccount(result.data);
 }
 
 export async function getDeliverableWithCurrentDraft(
@@ -381,12 +408,13 @@ export async function getDeliverableWithCurrentDraft(
   const deliverable = await getDeliverable(deliverableId);
   const { supabase } = await authenticatedContext();
   const [accountResult, draftResult, playbook] = await Promise.all([
-    supabase.from("client_accounts").select("*").eq("id", deliverable.accountId).single(),
+    supabase.from("client_accounts").select("*").eq("id", deliverable.accountId).maybeSingle(),
     supabase.from("drafts").select("*").eq("deliverable_id", deliverable.id).order("version", { ascending: false }).limit(1).maybeSingle(),
     getLatestPlaybook(deliverable.accountId),
   ]);
-  if (accountResult.error || !accountResult.data) fail("Unable to load deliverable account", accountResult.error);
-  if (draftResult.error) fail("Unable to load current draft", draftResult.error);
+  if (accountResult.error) fail("Failed to select deliverable account", accountResult.error);
+  if (!accountResult.data) missing("Client account", deliverable.accountId);
+  if (draftResult.error) fail("Failed to select current draft", draftResult.error);
   const draft = draftResult.data ? mapDraft(draftResult.data) : null;
   let verification: Verification | null = null;
   if (draft) {
@@ -397,7 +425,7 @@ export async function getDeliverableWithCurrentDraft(
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (verificationResult.error) fail("Unable to load draft verification", verificationResult.error);
+    if (verificationResult.error) fail("Failed to select current draft verification", verificationResult.error);
     verification = verificationResult.data ? mapVerification(verificationResult.data) : null;
   }
   return {
@@ -425,14 +453,14 @@ export async function createDraft(input: DraftInput): Promise<Draft> {
     })
     .select("*")
     .single();
-  if (result.error || !result.data) fail("Unable to create draft", result.error);
+  if (result.error || !result.data) fail("Failed to insert draft", result.error);
   return mapDraft(result.data);
 }
 
 export async function createVerification(input: VerificationInput): Promise<Verification> {
   const { supabase } = await authenticatedContext();
   const draftResult = await supabase.from("drafts").select("tenant_id").eq("id", input.draftId).single();
-  if (draftResult.error || !draftResult.data) fail("Unable to resolve verification draft", draftResult.error);
+  if (draftResult.error || !draftResult.data) fail("Failed to select the draft for verification", draftResult.error);
   const result = await supabase
     .from("verifications")
     .insert({
@@ -444,7 +472,7 @@ export async function createVerification(input: VerificationInput): Promise<Veri
     })
     .select("*")
     .single();
-  if (result.error || !result.data) fail("Unable to create verification", result.error);
+  if (result.error || !result.data) fail("Failed to insert verification", result.error);
   return mapVerification(result.data);
 }
 
@@ -462,7 +490,7 @@ export async function createApproval(input: ApprovalInput): Promise<Approval> {
     })
     .select("*")
     .single();
-  if (result.error || !result.data) fail("Unable to create approval", result.error);
+  if (result.error || !result.data) fail("Failed to insert human approval decision", result.error);
   return mapApproval(result.data);
 }
 
@@ -482,7 +510,7 @@ export async function appendEvent(input: EventInput): Promise<Event> {
     })
     .select("*")
     .single();
-  if (result.error || !result.data) fail("Unable to append event", result.error);
+  if (result.error || !result.data) fail("Failed to append chain-of-custody event", result.error);
   return mapEvent(result.data);
 }
 
@@ -493,7 +521,7 @@ export async function listEventsForAccount(accountId: string): Promise<Event[]> 
     .select("*")
     .eq("account_id", accountId)
     .order("created_at", { ascending: true });
-  if (result.error) fail("Unable to list account events", result.error);
+  if (result.error) fail("Failed to select account events", result.error);
   return (result.data ?? []).map(mapEvent);
 }
 
@@ -504,7 +532,7 @@ export async function listEventsForDeliverable(deliverableId: string): Promise<E
     .select("*")
     .eq("subject_ref", deliverableId)
     .order("created_at", { ascending: true });
-  if (result.error) fail("Unable to list deliverable events", result.error);
+  if (result.error) fail("Failed to select deliverable events", result.error);
   return (result.data ?? []).map(mapEvent);
 }
 
@@ -515,7 +543,7 @@ async function listApprovalsForDeliverable(deliverableId: string): Promise<Appro
     .select("*")
     .eq("deliverable_id", deliverableId)
     .order("created_at", { ascending: true });
-  if (result.error) fail("Unable to list deliverable approvals", result.error);
+  if (result.error) fail("Failed to select deliverable approvals", result.error);
   return (result.data ?? []).map(mapApproval);
 }
 
@@ -535,7 +563,7 @@ export async function updateDeliverableStatus(
     .eq("id", deliverableId)
     .select("*")
     .single();
-  if (result.error || !result.data) fail("Unable to update deliverable status", result.error);
+  if (result.error || !result.data) fail("Failed to update deliverable status", result.error);
   return mapDeliverable(result.data);
 }
 

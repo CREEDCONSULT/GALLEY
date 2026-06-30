@@ -17,7 +17,7 @@ The event log is the chain-of-custody source of truth. Database triggers reject 
 
 `lib/galley/repository.ts` owns typed database reads and writes. Server actions in `app/dashboard/proof/actions.ts` compose those operations for demo seeding and proof decisions. Client components only submit an action and refresh server-rendered data.
 
-The approval action checks that the current draft passed verification and is awaiting proof. The repository also enforces approval-before-scheduling/publishing as a server-side invariant. Approval records clearance for a future step; it never publishes content.
+The approval action checks that the current draft passed verification and is awaiting proof. The repository enforces approval-before-scheduling/publishing as a server-side invariant. The Phase 2.6 hardening migration adds the same check as a database trigger, so a direct status write cannot bypass it. Approval records clearance for a future step; it never publishes content.
 
 ## Demo seed and reset
 
