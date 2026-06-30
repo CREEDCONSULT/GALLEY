@@ -1,107 +1,19 @@
-"use client";
-
 import Link from "next/link";
-import { ArrowRight, BookOpen, Check, CircleAlert, ClipboardCheck, FileClock } from "lucide-react";
-import { useGalleyValidation } from "@/components/galley/GalleyValidationProvider";
+import { ArrowRight, BookOpen, CircleAlert, ClipboardCheck, FileClock } from "lucide-react";
+import { getDeliverableWithCurrentDraft, isSupabaseConfigured, listDeliverables, listEventsForDeliverable } from "@/lib/galley/repository";
 
-export default function DashboardOverview() {
-  const { accounts, deliverables, drafts, verifications, events } = useGalleyValidation();
-  const awaitingCount = deliverables.filter((item) => item.status === "awaiting_proof").length;
-  const verifyingCount = deliverables.filter((item) => item.status === "verifying").length;
-  const passedCount = verifications.filter((item) => item.result === "pass").length;
-  const stages = [
-    { label: "Produce", state: `${drafts.length} drafts`, complete: true },
-    { label: "Verify", state: verifyingCount > 0 ? `${verifyingCount} running` : `${passedCount} passed` },
-    { label: "Proof", state: `${awaitingCount} awaiting`, active: awaitingCount > 0 },
-    { label: "Schedule", state: "Not implemented" },
-    { label: "Report", state: "Not implemented" },
-  ];
-  const recent = deliverables.slice(0, 3).map((deliverable) => {
-    const account = accounts.find((candidate) => candidate.id === deliverable.accountId);
-    const relatedDrafts = drafts.filter((draft) => draft.deliverableId === deliverable.id);
-    const latestDraft = [...relatedDrafts].sort((left, right) => right.version - left.version)[0];
-    const verification = latestDraft
-      ? verifications.find((candidate) => candidate.draftId === latestDraft.id)
-      : undefined;
-    return {
-      client: account?.name ?? "Unknown account",
-      type: deliverable.type,
-      finding: verification?.reasons[0] ?? "A new verifier run is required.",
-      result: deliverable.status,
-    };
-  });
-
-  return (
-    <div className="mx-auto max-w-7xl">
-      <div className="flex flex-col gap-6 border-b border-border pb-8 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="eyebrow">Validation desk</p>
-          <h1 className="editorial-display mt-4 text-5xl md:text-6xl">{awaitingCount} {awaitingCount === 1 ? "decision is" : "decisions are"} waiting.</h1>
-          <p className="mt-4 max-w-2xl leading-7 text-muted">Mock drafts have been checked against their client playbooks. Only a recorded human decision can move a passed version beyond proof.</p>
-        </div>
-        <Link href="/dashboard/proof" className="group inline-flex items-center justify-center gap-3 bg-primary px-5 py-3.5 text-sm font-semibold text-background hover:bg-primary-strong">
-          Open proof queue <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-        </Link>
-      </div>
-
-      <section className="py-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="eyebrow">Current run</p>
-            <h2 className="mt-2 text-xl font-semibold">Monday client batch</h2>
-          </div>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-slate">Run / 2026-06-29-01</span>
-        </div>
-        <ol className="mt-6 grid grid-cols-2 border-l border-t border-border sm:grid-cols-5">
-          {stages.map((stage, index) => (
-            <li key={stage.label} className={`relative border-b border-r border-border p-5 ${index === stages.length - 1 ? "col-span-2 sm:col-span-1" : ""} ${stage.active ? "bg-surface-raised" : "bg-surface/30"}`}>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[9px] text-slate">0{index + 1}</span>
-                {stage.complete && <Check size={13} className="text-success" />}
-              </div>
-              <p className="mt-8 font-semibold">{stage.label}</p>
-              <p className={`mt-1 font-mono text-[9px] uppercase tracking-wider ${stage.active ? "text-primary" : "text-slate"}`}>{stage.state}</p>
-              {stage.active && <span className="absolute inset-x-0 bottom-0 h-px bg-primary" />}
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <div className="grid gap-6 border-t border-border pt-8 lg:grid-cols-[1.4fr_0.6fr]">
-        <section>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="eyebrow">At the gate</p>
-              <h2 className="mt-2 text-xl font-semibold">Current validation state</h2>
-            </div>
-            <Link href="/dashboard/proof" className="text-sm font-medium text-primary hover:text-primary-strong">Review all</Link>
-          </div>
-          <div className="mt-5 border border-border bg-surface">
-            {recent.map((item) => (
-              <Link href="/dashboard/proof" key={`${item.client}-${item.type}`} className="grid gap-3 border-b border-border p-5 transition-colors last:border-0 hover:bg-surface-raised sm:grid-cols-[1fr_0.75fr_1.25fr_auto] sm:items-center">
-                <div>
-                  <p className="font-medium">{item.client}</p>
-                  <p className="mt-1 text-xs text-slate">{item.type}</p>
-                </div>
-                <span className={`w-fit border px-2 py-1 font-mono text-[9px] uppercase tracking-wider ${item.result === "awaiting_proof" ? "border-warning/30 text-warning" : item.result === "verifying" ? "border-proof-blue/30 text-proof-blue" : item.result === "approved" ? "border-success/30 text-success" : "border-danger/30 text-danger"}`}>{item.result.replaceAll("_", " ")}</span>
-                <p className="text-sm text-muted">{item.finding}</p>
-                <ArrowRight size={15} className="text-slate" />
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <aside className="border border-border bg-[#0d0d0c] p-6">
-          <ClipboardCheck size={20} className="text-primary" />
-          <h2 className="mt-8 text-xl font-semibold">The proof gate is explicit.</h2>
-          <p className="mt-3 text-sm leading-6 text-muted">Approval clears a specific version for a future scheduling step. It does not publish the deliverable.</p>
-          <div className="mt-7 space-y-3 border-t border-border pt-5 text-sm">
-            <div className="flex items-center gap-3 text-ink-soft"><CircleAlert size={15} className="text-warning" /> {awaitingCount} {awaitingCount === 1 ? "item" : "items"} awaiting proof</div>
-            <div className="flex items-center gap-3 text-ink-soft"><FileClock size={15} className="text-slate" /> {events.length} append-only events in local state</div>
-            <div className="flex items-center gap-3 text-ink-soft"><BookOpen size={15} className="text-primary" /> Playbook rules travel with the draft</div>
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
+export const dynamic = "force-dynamic";
+export default async function DashboardOverview() {
+  const configured = isSupabaseConfigured(); let error = ""; let deliverables = [] as Awaited<ReturnType<typeof listDeliverables>>;
+  if (configured) try { deliverables = await listDeliverables(); } catch (cause) { error = cause instanceof Error ? cause.message : "Unable to load the workspace."; }
+  const awaiting = deliverables.filter((item) => item.status === "awaiting_proof").length;
+  const recent = await Promise.all(deliverables.slice(0,3).map((item) => getDeliverableWithCurrentDraft(item.id)));
+  const eventCounts = await Promise.all(deliverables.map((item) => listEventsForDeliverable(item.id).then((events) => events.length)));
+  return <div className="mx-auto max-w-7xl">
+    <header className="flex flex-col gap-6 border-b border-border pb-8 md:flex-row md:items-end md:justify-between"><div><p className="eyebrow">Validation desk</p><h1 className="editorial-display mt-4 text-5xl md:text-6xl">{awaiting} {awaiting === 1 ? "decision is" : "decisions are"} waiting.</h1><p className="mt-4 max-w-2xl leading-7 text-muted">The Proof Queue is the central workspace. Verified drafts stop at a recorded human gate before any future scheduling step.</p></div><Link href="/dashboard/proof" className="inline-flex items-center justify-center gap-3 bg-primary px-5 py-3.5 text-sm font-semibold text-background">Open proof queue <ArrowRight size={16}/></Link></header>
+    {(!configured || error) && <section className="mt-8 border border-warning/30 bg-warning/5 p-6"><h2 className="font-semibold">Connect the persistence layer</h2><p className="mt-2 text-sm text-muted">{error || "Configure Supabase and sign in. The interface remains available without inventing dashboard data."}</p></section>}
+    <section className="py-8"><p className="eyebrow">Governed loop</p><ol className="mt-5 grid grid-cols-2 border-l border-t border-border sm:grid-cols-5">{[["Produce",`${deliverables.length} drafts`],["Verify","Playbook checks"],["Proof",`${awaiting} awaiting`],["Schedule","Not implemented"],["Report","Not implemented"]].map(([label,state],index) => <li key={label} className="border-b border-r border-border bg-surface/30 p-5"><span className="font-mono text-[9px] text-slate">0{index+1}</span><p className="mt-8 font-semibold">{label}</p><p className="mt-1 font-mono text-[9px] uppercase text-slate">{state}</p></li>)}</ol></section>
+    <div className="grid gap-6 border-t border-border pt-8 lg:grid-cols-[1.4fr_.6fr]"><section><div className="flex items-end justify-between"><div><p className="eyebrow">At the gate</p><h2 className="mt-2 text-xl font-semibold">Persisted validation state</h2></div><Link href="/dashboard/proof" className="text-sm text-primary">Review all</Link></div><div className="mt-5 border border-border bg-surface">{recent.length === 0 ? <p className="p-8 text-sm text-muted">No persisted work yet. Seed a demo from the Proof Queue.</p> : recent.map(({deliverable,account,verification}) => <Link href={`/dashboard/records?deliverable=${deliverable.id}`} key={deliverable.id} className="grid gap-3 border-b border-border p-5 last:border-0 sm:grid-cols-[1fr_.75fr_1.25fr_auto] sm:items-center"><div><p className="font-medium">{account.name}</p><p className="mt-1 text-xs text-slate">{deliverable.type}</p></div><span className="w-fit border border-border px-2 py-1 font-mono text-[9px] uppercase text-warning">{deliverable.status.replaceAll("_"," ")}</span><p className="text-sm text-muted">{verification?.reasons[0] ?? "Awaiting a verifier result."}</p><ArrowRight size={15} className="text-slate"/></Link>)}</div></section>
+    <aside className="border border-border bg-[#0d0d0c] p-6"><ClipboardCheck size={20} className="text-primary"/><h2 className="mt-8 text-xl font-semibold">Approval is explicit.</h2><p className="mt-3 text-sm leading-6 text-muted">Approval records a decision for one version. It does not publish it.</p><div className="mt-7 space-y-3 border-t border-border pt-5 text-sm"><div className="flex gap-3"><CircleAlert size={15} className="text-warning"/>{awaiting} awaiting proof</div><div className="flex gap-3"><FileClock size={15} className="text-slate"/>{eventCounts.reduce((sum,count)=>sum+count,0)} persisted events</div><div className="flex gap-3"><BookOpen size={15} className="text-primary"/>Playbook is brand truth</div></div></aside></div>
+  </div>;
 }

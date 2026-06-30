@@ -14,16 +14,26 @@ export type ClientAccountStatus = "active" | "paused" | "archived";
 export type EventActorType = "system" | "generator" | "verifier" | "human";
 
 export type GalleyEventType =
+  | "client_account.created"
+  | "playbook.created"
+  | "deliverable.created"
   | "playbook.selected"
   | "draft.generated"
   | "verification.passed"
   | "verification.failed"
   | "deliverable.awaiting_proof"
+  | "proof.awaiting"
   | "human.approved"
   | "human.edited"
   | "human.rejected"
+  | "approval.approved"
+  | "approval.edited"
+  | "approval.rejected"
+  | "deliverable.status_changed"
   | "deliverable.scheduled"
-  | "deliverable.published";
+  | "deliverable.published"
+  | "demo.seeded"
+  | "demo.reset";
 
 export interface Tenant {
   id: string;
@@ -123,4 +133,3 @@ export interface MockValidationState {
   approvals: Approval[];
   events: Event[];
 }
-

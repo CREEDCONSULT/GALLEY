@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "validate:galley": "node --experimental-strip-types scripts/validate-galley-node.mjs"
+    "validate:galley": "node --experimental-strip-types scripts/validate-galley-node.mjs",
+    "validate:galley:persistence": "node --experimental-strip-types scripts/validate-galley-persistence.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

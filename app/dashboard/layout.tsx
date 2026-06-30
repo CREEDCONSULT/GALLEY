@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { GalleyValidationProvider } from "@/components/galley/GalleyValidationProvider";
 import {
   BookOpen,
   ClipboardCheck,
@@ -24,7 +23,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
 
   return (
-    <GalleyValidationProvider>
     <div className="min-h-screen bg-background text-foreground md:grid md:grid-cols-[16rem_1fr]">
       <aside className="hidden min-h-screen border-r border-border bg-[#0d0d0c] md:sticky md:top-0 md:flex md:h-screen md:flex-col">
         <div className="border-b border-border p-6">
@@ -91,6 +89,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="p-5 md:p-8 lg:p-10">{children}</main>
       </div>
     </div>
-    </GalleyValidationProvider>
   );
 }
