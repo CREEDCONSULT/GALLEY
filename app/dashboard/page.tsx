@@ -1,28 +1,43 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, BookOpen, Check, CircleAlert, ClipboardCheck, FileClock } from "lucide-react";
-
-const stages = [
-  { label: "Produce", state: "5 drafts", complete: true },
-  { label: "Verify", state: "1 in progress" },
-  { label: "Proof", state: "1 awaiting", active: true },
-  { label: "Schedule", state: "Not connected" },
-  { label: "Report", state: "Not connected" },
-];
-
-const recent = [
-  { client: "Glow Skincare", type: "Landing page", finding: "Passed with one source note", result: "Awaiting proof" },
-  { client: "Northshore Fitness", type: "Lifecycle email", finding: "Eight playbook checks running", result: "Verifying" },
-  { client: "Day One", type: "Paid social", finding: "Forbidden absolute claim", result: "Rejected" },
-];
+import { useGalleyValidation } from "@/components/galley/GalleyValidationProvider";
 
 export default function DashboardOverview() {
+  const { accounts, deliverables, drafts, verifications, events } = useGalleyValidation();
+  const awaitingCount = deliverables.filter((item) => item.status === "awaiting_proof").length;
+  const verifyingCount = deliverables.filter((item) => item.status === "verifying").length;
+  const passedCount = verifications.filter((item) => item.result === "pass").length;
+  const stages = [
+    { label: "Produce", state: `${drafts.length} drafts`, complete: true },
+    { label: "Verify", state: verifyingCount > 0 ? `${verifyingCount} running` : `${passedCount} passed` },
+    { label: "Proof", state: `${awaitingCount} awaiting`, active: awaitingCount > 0 },
+    { label: "Schedule", state: "Not implemented" },
+    { label: "Report", state: "Not implemented" },
+  ];
+  const recent = deliverables.slice(0, 3).map((deliverable) => {
+    const account = accounts.find((candidate) => candidate.id === deliverable.accountId);
+    const relatedDrafts = drafts.filter((draft) => draft.deliverableId === deliverable.id);
+    const latestDraft = [...relatedDrafts].sort((left, right) => right.version - left.version)[0];
+    const verification = latestDraft
+      ? verifications.find((candidate) => candidate.draftId === latestDraft.id)
+      : undefined;
+    return {
+      client: account?.name ?? "Unknown account",
+      type: deliverable.type,
+      finding: verification?.reasons[0] ?? "A new verifier run is required.",
+      result: deliverable.status,
+    };
+  });
+
   return (
     <div className="mx-auto max-w-7xl">
       <div className="flex flex-col gap-6 border-b border-border pb-8 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="eyebrow">Validation desk</p>
-          <h1 className="editorial-display mt-4 text-5xl md:text-6xl">One decision is waiting.</h1>
-          <p className="mt-4 max-w-2xl leading-7 text-muted">Glow Skincare passed verification and is ready for human proof. Northshore Fitness is still being checked.</p>
+          <h1 className="editorial-display mt-4 text-5xl md:text-6xl">{awaitingCount} {awaitingCount === 1 ? "decision is" : "decisions are"} waiting.</h1>
+          <p className="mt-4 max-w-2xl leading-7 text-muted">Mock drafts have been checked against their client playbooks. Only a recorded human decision can move a passed version beyond proof.</p>
         </div>
         <Link href="/dashboard/proof" className="group inline-flex items-center justify-center gap-3 bg-primary px-5 py-3.5 text-sm font-semibold text-background hover:bg-primary-strong">
           Open proof queue <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
@@ -68,7 +83,7 @@ export default function DashboardOverview() {
                   <p className="font-medium">{item.client}</p>
                   <p className="mt-1 text-xs text-slate">{item.type}</p>
                 </div>
-                <span className={`w-fit border px-2 py-1 font-mono text-[9px] uppercase tracking-wider ${item.result === "Awaiting proof" ? "border-warning/30 text-warning" : item.result === "Verifying" ? "border-proof-blue/30 text-proof-blue" : "border-danger/30 text-danger"}`}>{item.result}</span>
+                <span className={`w-fit border px-2 py-1 font-mono text-[9px] uppercase tracking-wider ${item.result === "awaiting_proof" ? "border-warning/30 text-warning" : item.result === "verifying" ? "border-proof-blue/30 text-proof-blue" : item.result === "approved" ? "border-success/30 text-success" : "border-danger/30 text-danger"}`}>{item.result.replaceAll("_", " ")}</span>
                 <p className="text-sm text-muted">{item.finding}</p>
                 <ArrowRight size={15} className="text-slate" />
               </Link>
@@ -81,8 +96,8 @@ export default function DashboardOverview() {
           <h2 className="mt-8 text-xl font-semibold">The proof gate is explicit.</h2>
           <p className="mt-3 text-sm leading-6 text-muted">Approval clears a specific version for a future scheduling step. It does not publish the deliverable.</p>
           <div className="mt-7 space-y-3 border-t border-border pt-5 text-sm">
-            <div className="flex items-center gap-3 text-ink-soft"><CircleAlert size={15} className="text-warning" /> 1 item awaiting proof</div>
-            <div className="flex items-center gap-3 text-ink-soft"><FileClock size={15} className="text-slate" /> Every action enters the record</div>
+            <div className="flex items-center gap-3 text-ink-soft"><CircleAlert size={15} className="text-warning" /> {awaitingCount} {awaitingCount === 1 ? "item" : "items"} awaiting proof</div>
+            <div className="flex items-center gap-3 text-ink-soft"><FileClock size={15} className="text-slate" /> {events.length} append-only events in local state</div>
             <div className="flex items-center gap-3 text-ink-soft"><BookOpen size={15} className="text-primary" /> Playbook rules travel with the draft</div>
           </div>
         </aside>

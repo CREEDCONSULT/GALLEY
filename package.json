@@ -2,11 +2,13 @@
   "name": "galley",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "validate:galley": "node --experimental-strip-types scripts/validate-galley-node.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

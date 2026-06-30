@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  CalendarClock,
   Check,
   CircleAlert,
   CircleX,
@@ -13,117 +12,100 @@ import {
   PencilLine,
   ShieldCheck,
 } from "lucide-react";
+import { useGalleyValidation } from "@/components/galley/GalleyValidationProvider";
+import type { Deliverable, DeliverableStatus } from "@/lib/galley/types";
 
-type Status = "Awaiting proof" | "Verifying" | "Approved" | "Scheduled" | "Rejected";
-type Filter = "All" | Status;
+type Filter = "all" | DeliverableStatus;
 
-type Deliverable = {
-  id: string;
-  title: string;
-  client: string;
-  type: string;
-  channel: string;
-  excerpt: string;
-  verifier: string;
-  verifierTone: "pass" | "running" | "flag";
-  status: Status;
-  received: string;
-};
-
-const filters: Filter[] = ["All", "Awaiting proof", "Verifying", "Approved", "Scheduled", "Rejected"];
-
-const deliverables: Deliverable[] = [
-  {
-    id: "GLY-0218",
-    title: "Barrier care launch page",
-    client: "Glow Skincare",
-    type: "Landing page",
-    channel: "Website",
-    excerpt: "A calmer approach to barrier care, built around what sensitive skin needs—and nothing it does not.",
-    verifier: "Passed with 1 source note",
-    verifierTone: "pass",
-    status: "Awaiting proof",
-    received: "09:42",
-  },
-  {
-    id: "GLY-0219",
-    title: "June member retention email",
-    client: "Northshore Fitness",
-    type: "Lifecycle email",
-    channel: "Email",
-    excerpt: "Your next month starts before the calendar turns. Here is the plan your coach prepared for the weeks ahead.",
-    verifier: "Running 8 playbook checks",
-    verifierTone: "running",
-    status: "Verifying",
-    received: "10:06",
-  },
-  {
-    id: "GLY-0220",
-    title: "Procurement operations guide",
-    client: "Acme Corp",
-    type: "Article",
-    channel: "Resource center",
-    excerpt: "A practical operating model for teams that need procurement controls without slowing every purchasing decision.",
-    verifier: "Passed all playbook checks",
-    verifierTone: "pass",
-    status: "Approved",
-    received: "10:18",
-  },
-  {
-    id: "GLY-0221",
-    title: "Founder story cutdown",
-    client: "Day One",
-    type: "Social post",
-    channel: "LinkedIn",
-    excerpt: "Day One began with a simple observation: the best routines are the ones people can actually keep.",
-    verifier: "Passed all playbook checks",
-    verifierTone: "pass",
-    status: "Scheduled",
-    received: "10:31",
-  },
-  {
-    id: "GLY-0222",
-    title: "Summer launch paid social",
-    client: "Day One",
-    type: "Paid social",
-    channel: "Instagram",
-    excerpt: "The only daily system you will ever need—guaranteed to change how you work from the first week.",
-    verifier: "Blocked: forbidden absolute claim",
-    verifierTone: "flag",
-    status: "Rejected",
-    received: "10:44",
-  },
+const filters: Array<{ value: Filter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "awaiting_proof", label: "Awaiting proof" },
+  { value: "verifying", label: "Verifying" },
+  { value: "approved", label: "Approved" },
+  { value: "escalated", label: "Escalated" },
+  { value: "rejected", label: "Rejected" },
 ];
 
-const statusStyles: Record<Status, string> = {
-  "Awaiting proof": "border-status-awaiting-proof/40 bg-status-awaiting-proof/5 text-status-awaiting-proof",
-  Verifying: "border-status-verifying/40 bg-status-verifying/5 text-status-verifying",
-  Approved: "border-status-approved/40 bg-status-approved/5 text-status-approved",
-  Scheduled: "border-status-scheduled/40 bg-status-scheduled/5 text-status-scheduled",
-  Rejected: "border-status-rejected/40 bg-status-rejected/5 text-status-rejected",
+const statusLabels: Record<DeliverableStatus, string> = {
+  drafting: "Drafting",
+  verifying: "Verifying",
+  awaiting_proof: "Awaiting proof",
+  approved: "Approved",
+  scheduled: "Scheduled",
+  published: "Published",
+  rejected: "Rejected",
+  escalated: "Escalated",
 };
 
-const verifierStyles = {
-  pass: "text-success",
-  running: "text-proof-blue",
-  flag: "text-danger",
+const statusStyles: Record<DeliverableStatus, string> = {
+  drafting: "border-status-drafting/40 bg-status-drafting/5 text-status-drafting",
+  verifying: "border-status-verifying/40 bg-status-verifying/5 text-status-verifying",
+  awaiting_proof: "border-status-awaiting-proof/40 bg-status-awaiting-proof/5 text-status-awaiting-proof",
+  approved: "border-status-approved/40 bg-status-approved/5 text-status-approved",
+  scheduled: "border-status-scheduled/40 bg-status-scheduled/5 text-status-scheduled",
+  published: "border-status-published/40 bg-status-published/5 text-status-published",
+  rejected: "border-status-rejected/40 bg-status-rejected/5 text-status-rejected",
+  escalated: "border-status-escalated/40 bg-status-escalated/5 text-status-escalated",
 };
+
+function timeLabel(isoDate: string): string {
+  return isoDate.slice(11, 16);
+}
+
+function StatusIcon({ status }: { status: DeliverableStatus }) {
+  if (status === "awaiting_proof") return <Eye size={11} />;
+  if (status === "verifying" || status === "drafting") return <Clock3 size={11} />;
+  if (status === "approved" || status === "scheduled" || status === "published") return <Check size={11} />;
+  return <CircleX size={11} />;
+}
 
 export default function ProofQueuePage() {
-  const [activeFilter, setActiveFilter] = useState<Filter>("Awaiting proof");
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, Status>>({});
+  const {
+    accounts,
+    playbooks,
+    deliverables,
+    drafts,
+    verifications,
+    approve,
+    edit,
+    reject,
+    selectDeliverable,
+  } = useGalleyValidation();
+  const [activeFilter, setActiveFilter] = useState<Filter>("awaiting_proof");
   const [notice, setNotice] = useState("");
 
   const rows = useMemo(
-    () => deliverables
-      .map((item) => ({ ...item, status: statusOverrides[item.id] ?? item.status }))
-      .filter((item) => activeFilter === "All" || item.status === activeFilter),
-    [activeFilter, statusOverrides],
+    () => deliverables.filter(
+      (deliverable) => activeFilter === "all" || deliverable.status === activeFilter,
+    ),
+    [activeFilter, deliverables],
   );
 
-  const decide = (item: Deliverable, status: Status, message: string) => {
-    setStatusOverrides((current) => ({ ...current, [item.id]: status }));
-    setNotice(`${item.title}: ${message}`);
+  const countFor = (filter: Filter) =>
+    filter === "all"
+      ? deliverables.length
+      : deliverables.filter((deliverable) => deliverable.status === filter).length;
+
+  const latestDraftFor = (deliverableId: string) =>
+    drafts
+      .filter((draft) => draft.deliverableId === deliverableId)
+      .sort((left, right) => right.version - left.version)[0];
+
+  const takeAction = (
+    deliverable: Deliverable,
+    action: "approve" | "edit" | "reject",
+  ) => {
+    selectDeliverable(deliverable.id);
+    if (action === "approve") {
+      approve(deliverable.id);
+      setNotice(`${deliverable.title}: human approval recorded. The version is cleared for a future scheduling step.`);
+    } else if (action === "edit") {
+      edit(deliverable.id);
+      setNotice(`${deliverable.title}: edit recorded. Draft v2 returned to verification.`);
+    } else {
+      reject(deliverable.id);
+      setNotice(`${deliverable.title}: rejection recorded. The deliverable will not move forward.`);
+    }
   };
 
   return (
@@ -133,7 +115,7 @@ export default function ProofQueuePage() {
           <div>
             <p className="eyebrow">Human approval gate</p>
             <h1 className="editorial-display mt-4 text-5xl md:text-6xl">Proof Queue</h1>
-            <p className="mt-4 max-w-2xl leading-7 text-muted">Drafts checked against the client playbook. A human decision is required before anything advances.</p>
+            <p className="mt-4 max-w-2xl leading-7 text-muted">Drafts checked against the active client playbook. A recorded human decision is required before anything advances.</p>
           </div>
           <div className="flex items-center gap-3 border border-success/30 bg-success/5 px-4 py-3 text-xs text-success">
             <ShieldCheck size={15} /> Nothing publishes without approval
@@ -142,19 +124,16 @@ export default function ProofQueuePage() {
 
         <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border" aria-label="Proof queue filters">
           {filters.map((filter) => {
-            const active = filter === activeFilter;
-            const count = filter === "All"
-              ? deliverables.length
-              : deliverables.filter((item) => (statusOverrides[item.id] ?? item.status) === filter).length;
+            const active = filter.value === activeFilter;
             return (
               <button
-                key={filter}
+                key={filter.value}
                 type="button"
-                onClick={() => setActiveFilter(filter)}
+                onClick={() => setActiveFilter(filter.value)}
                 aria-pressed={active}
                 className={`shrink-0 border-b-2 px-4 py-3 text-xs transition-colors ${active ? "border-primary text-foreground" : "border-transparent text-slate hover:text-ink-soft"}`}
               >
-                {filter} <span className="ml-1 font-mono text-[9px]">{count}</span>
+                {filter.label} <span className="ml-1 font-mono text-[9px]">{countFor(filter.value)}</span>
               </button>
             );
           })}
@@ -162,73 +141,88 @@ export default function ProofQueuePage() {
       </header>
 
       <p role="status" aria-live="polite" className={`mt-5 min-h-5 text-xs ${notice ? "text-primary-strong" : "text-transparent"}`}>
-        {notice || "No action taken"}
+        {notice || "No proof action taken"}
       </p>
 
       <div className="mt-2 border border-border bg-surface">
-        <div className="hidden grid-cols-[1.35fr_0.8fr_0.9fr_0.82fr_auto] gap-5 border-b border-border bg-[#0d0d0c] px-6 py-3 font-mono text-[9px] uppercase tracking-wider text-slate lg:grid">
-          <span>Deliverable</span><span>Client</span><span>Verifier</span><span>Status</span><span className="text-right">Actions</span>
+        <div className="hidden grid-cols-[1.25fr_0.72fr_1.05fr_0.72fr_auto] gap-5 border-b border-border bg-[#0d0d0c] px-6 py-3 font-mono text-[9px] uppercase tracking-wider text-slate lg:grid">
+          <span>Deliverable</span><span>Client</span><span>Verifier evidence</span><span>Status</span><span className="text-right">Human action</span>
         </div>
 
         {rows.length === 0 ? (
           <div className="px-6 py-20 text-center">
             <FileCheck2 size={24} className="mx-auto text-primary" />
-            <h2 className="mt-5 text-lg font-semibold">No drafts awaiting proof.</h2>
-            <p className="mt-2 text-sm text-muted">When a draft passes verification, it will appear here for human approval.</p>
+            <h2 className="mt-5 text-lg font-semibold">No deliverables in this state.</h2>
+            <p className="mt-2 text-sm text-muted">The queue updates as mock drafts are verified and human decisions are recorded.</p>
           </div>
-        ) : rows.map((item) => {
-          const canApprove = item.status === "Awaiting proof";
+        ) : rows.map((deliverable) => {
+          const account = accounts.find((candidate) => candidate.id === deliverable.accountId);
+          const playbook = playbooks.find((candidate) => candidate.accountId === deliverable.accountId);
+          const draft = latestDraftFor(deliverable.id);
+          const verification = draft
+            ? verifications.find((candidate) => candidate.draftId === draft.id)
+            : undefined;
+          const canProof = deliverable.status === "awaiting_proof" && verification?.result === "pass";
+          const verificationReasons = verification?.reasons ?? [
+            deliverable.status === "verifying"
+              ? "Human edit recorded; this version needs a new verifier run."
+              : "No verifier result is attached to the latest draft.",
+          ];
+
           return (
-            <article key={item.id} className="grid gap-5 border-b border-border px-6 py-6 last:border-0 lg:grid-cols-[1.35fr_0.8fr_0.9fr_0.82fr_auto] lg:items-center">
+            <article key={deliverable.id} className="grid gap-5 border-b border-border px-6 py-6 last:border-0 lg:grid-cols-[1.25fr_0.72fr_1.05fr_0.72fr_auto] lg:items-center">
               <div className="min-w-0">
-                <p className="font-mono text-[9px] uppercase tracking-wider text-slate">{item.id} · {item.received}</p>
-                <h2 className="mt-2 font-semibold text-foreground">{item.title}</h2>
-                <p className="mt-1 text-xs text-muted">{item.type} · {item.channel}</p>
-                <p className="mt-3 line-clamp-2 max-w-xl text-sm leading-6 text-slate">“{item.excerpt}”</p>
+                <p className="font-mono text-[9px] uppercase tracking-wider text-slate">{deliverable.id} · {timeLabel(deliverable.updatedAt)}</p>
+                <h2 className="mt-2 font-semibold text-foreground">{deliverable.title}</h2>
+                <p className="mt-1 text-xs text-muted">{deliverable.type} · {deliverable.channel} · Draft v{draft?.version ?? 0}</p>
+                <p className="mt-3 line-clamp-2 max-w-xl text-sm leading-6 text-slate">“{draft?.content ?? "Draft unavailable."}”</p>
               </div>
 
               <div>
                 <p className="mb-1 font-mono text-[9px] uppercase tracking-wider text-slate lg:hidden">Client</p>
-                <p className="text-sm font-medium text-ink-soft">{item.client}</p>
+                <p className="text-sm font-medium text-ink-soft">{account?.name ?? "Unknown account"}</p>
+                <p className="mt-1 font-mono text-[8px] uppercase tracking-wider text-slate">Playbook v{playbook?.version ?? "—"}</p>
               </div>
 
               <div>
-                <p className="mb-1 font-mono text-[9px] uppercase tracking-wider text-slate lg:hidden">Verifier</p>
-                <p className={`flex items-start gap-2 text-xs leading-5 ${verifierStyles[item.verifierTone]}`}>
-                  {item.verifierTone === "pass" ? <Check size={14} className="mt-0.5 shrink-0" /> : item.verifierTone === "running" ? <Clock3 size={14} className="mt-0.5 shrink-0" /> : <CircleAlert size={14} className="mt-0.5 shrink-0" />}
-                  {item.verifier}
+                <p className="mb-1 font-mono text-[9px] uppercase tracking-wider text-slate lg:hidden">Verifier evidence</p>
+                <p className={`flex items-center gap-2 text-xs font-medium ${verification?.result === "pass" ? "text-success" : verification?.result === "fail" ? "text-danger" : "text-proof-blue"}`}>
+                  {verification?.result === "pass" ? <Check size={14} /> : verification?.result === "fail" ? <CircleAlert size={14} /> : <Clock3 size={14} />}
+                  {verification?.result === "pass" ? "Passed" : verification?.result === "fail" ? "Failed" : "Re-verification required"}
                 </p>
+                <ul className="mt-2 space-y-1 text-[11px] leading-4 text-slate">
+                  {verificationReasons.slice(0, 2).map((reason) => <li key={reason}>— {reason}</li>)}
+                </ul>
               </div>
 
               <div>
                 <p className="mb-1 font-mono text-[9px] uppercase tracking-wider text-slate lg:hidden">Status</p>
-                <span className={`inline-flex items-center gap-1.5 border px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-wider ${statusStyles[item.status]}`}>
-                  {item.status === "Awaiting proof" && <Eye size={11} />}
-                  {item.status === "Verifying" && <Clock3 size={11} />}
-                  {item.status === "Approved" && <Check size={11} />}
-                  {item.status === "Scheduled" && <CalendarClock size={11} />}
-                  {item.status === "Rejected" && <CircleX size={11} />}
-                  {item.status}
+                <span className={`inline-flex items-center gap-1.5 border px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-wider ${statusStyles[deliverable.status]}`}>
+                  <StatusIcon status={deliverable.status} />
+                  {statusLabels[deliverable.status]}
                 </span>
               </div>
 
               <div className="lg:w-52">
-                {canApprove ? (
+                {canProof ? (
                   <div className="grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => decide(item, "Approved", "approved for the next stage")} className="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 bg-foreground px-3 py-2 text-xs font-semibold text-background transition-colors hover:bg-primary-strong"><Check size={14} /> Approve draft</button>
-                    <button type="button" onClick={() => decide(item, "Awaiting proof", "edit requested")} className="inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] text-muted transition-colors hover:border-proof-blue/50 hover:text-foreground"><PencilLine size={13} /> Edit</button>
-                    <button type="button" onClick={() => decide(item, "Rejected", "rejected by reviewer")} className="inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] text-muted transition-colors hover:border-danger/50 hover:text-danger"><CircleX size={13} /> Reject</button>
-                    <Link href="/dashboard/records" className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] font-medium text-proof-blue transition-colors hover:border-proof-blue/50 hover:text-foreground"><Eye size={13} /> View record</Link>
+                    <button type="button" onClick={() => takeAction(deliverable, "approve")} className="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 bg-foreground px-3 py-2 text-xs font-semibold text-background transition-colors hover:bg-primary-strong"><Check size={14} /> Approve draft</button>
+                    <button type="button" onClick={() => takeAction(deliverable, "edit")} className="inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] text-muted transition-colors hover:border-proof-blue/50 hover:text-foreground"><PencilLine size={13} /> Edit</button>
+                    <button type="button" onClick={() => takeAction(deliverable, "reject")} className="inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] text-muted transition-colors hover:border-danger/50 hover:text-danger"><CircleX size={13} /> Reject</button>
+                    <Link href="/dashboard/records" onClick={() => selectDeliverable(deliverable.id)} className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1.5 border border-border px-3 py-2 text-[11px] font-medium text-proof-blue transition-colors hover:border-proof-blue/50 hover:text-foreground"><Eye size={13} /> View record</Link>
                   </div>
                 ) : (
                   <div className="border-l border-border pl-4 lg:text-right">
                     <p className="text-xs leading-5 text-slate">
-                      {item.status === "Verifying" && "Verification must finish before proof."}
-                      {item.status === "Approved" && "Human decision recorded."}
-                      {item.status === "Scheduled" && "Cleared by proof and queued in the prototype."}
-                      {item.status === "Rejected" && "Stopped by a recorded reviewer decision."}
+                      {deliverable.status === "verifying" && "Verification must finish before proof."}
+                      {deliverable.status === "approved" && "Human approval is in the record."}
+                      {deliverable.status === "rejected" && "Stopped by a human rejection."}
+                      {deliverable.status === "escalated" && "Verifier failure requires human attention."}
+                      {deliverable.status === "drafting" && "Draft production is still in progress."}
+                      {deliverable.status === "scheduled" && "Scheduling is not implemented in Phase 2."}
+                      {deliverable.status === "published" && "Publishing is not implemented in Phase 2."}
                     </p>
-                    <Link href="/dashboard/records" className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-proof-blue hover:text-foreground"><Eye size={13} /> View record</Link>
+                    <Link href="/dashboard/records" onClick={() => selectDeliverable(deliverable.id)} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-proof-blue hover:text-foreground"><Eye size={13} /> View record</Link>
                   </div>
                 )}
               </div>
@@ -237,7 +231,7 @@ export default function ProofQueuePage() {
         })}
       </div>
 
-      <p className="mt-6 border-t border-border pt-6 text-xs leading-5 text-slate">Static prototype data. Actions update this browser session only and do not generate, schedule, or publish content.</p>
+      <p className="mt-6 border-t border-border pt-6 text-xs leading-5 text-slate">Local Phase 2 state only. Mock generation, verification, proof decisions, and events are connected; scheduling and publishing remain unavailable.</p>
     </div>
   );
 }
