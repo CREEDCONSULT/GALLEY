@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Check, CircleAlert, Clock3, Eye, FileCheck2, ShieldCheck } from "lucide-react";
 import { DemoControls } from "@/components/galley/DemoControls";
 import { ProofActions } from "@/components/galley/ProofActions";
-import { getDeliverableWithCurrentDraft, isSupabaseConfigured, listDeliverables } from "@/lib/galley/repository";
+import { getQueueDetails, isBackendConfigured } from "@/lib/galley/convexData";
 import type { DeliverableStatus } from "@/lib/galley/types";
 
 export const dynamic = "force-dynamic";
@@ -16,14 +16,14 @@ const labels: Record<DeliverableStatus, string> = { drafting: "Drafting", verify
 const styles: Record<DeliverableStatus, string> = { drafting: "text-slate", verifying: "text-proof-blue", awaiting_proof: "text-warning", approved: "text-success", scheduled: "text-proof-blue", published: "text-success", rejected: "text-danger", escalated: "text-danger" };
 
 export default async function ProofQueuePage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  const configured = isSupabaseConfigured();
+  const configured = isBackendConfigured();
   const requested = (await searchParams).status ?? "awaiting_proof";
   const active: Filter = filters.some((item) => item.value === requested) ? requested as Filter : "awaiting_proof";
   let error = "";
-  let all = [] as Awaited<ReturnType<typeof listDeliverables>>;
-  if (configured) try { all = await listDeliverables(); } catch (cause) { error = cause instanceof Error ? cause.message : "Unable to load the proof queue."; }
-  const rows = all.filter((item) => active === "all" || item.status === active);
-  const details = await Promise.all(rows.map((item) => getDeliverableWithCurrentDraft(item.id)));
+  let queue = [] as Awaited<ReturnType<typeof getQueueDetails>>;
+  if (configured) try { queue = await getQueueDetails(); } catch (cause) { error = cause instanceof Error ? cause.message : "Unable to load the proof queue."; }
+  const all = queue.map((row) => row.deliverable);
+  const details = queue.filter((row) => active === "all" || row.deliverable.status === active);
 
   return <div className="mx-auto max-w-7xl">
     <header className="border-b border-border pb-8">
@@ -37,8 +37,8 @@ export default async function ProofQueuePage({ searchParams }: { searchParams: P
     </header>
 
     <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_18rem]"><div>
-      {(!configured || error) && <section className="border border-warning/30 bg-warning/5 p-6"><h2 className="font-semibold">Persistence setup required</h2><p className="mt-2 text-sm leading-6 text-muted">{error || "Add the public Supabase URL and anonymous key, apply the Galley migrations, then sign in to load persisted work."}</p></section>}
-      {configured && !error && rows.length === 0 && <section className="border border-border bg-surface px-6 py-20 text-center"><FileCheck2 size={24} className="mx-auto text-primary" /><h2 className="mt-5 text-lg font-semibold">No deliverables in this state.</h2><p className="mt-2 text-sm text-muted">Seed the local demo or choose another queue state.</p></section>}
+      {(!configured || error) && <section className="border border-warning/30 bg-warning/5 p-6"><h2 className="font-semibold">Persistence setup required</h2><p className="mt-2 text-sm leading-6 text-muted">{error || "Set NEXT_PUBLIC_CONVEX_URL and deploy the Convex functions to load persisted work."}</p></section>}
+      {configured && !error && details.length === 0 && <section className="border border-border bg-surface px-6 py-20 text-center"><FileCheck2 size={24} className="mx-auto text-primary" /><h2 className="mt-5 text-lg font-semibold">No deliverables in this state.</h2><p className="mt-2 text-sm text-muted">Seed the local demo or choose another queue state.</p></section>}
       {details.length > 0 && <div className="border border-border bg-surface"><div className="hidden grid-cols-[1.2fr_.7fr_1fr_.65fr_auto] gap-5 border-b border-border px-6 py-3 font-mono text-[9px] uppercase tracking-wider text-slate lg:grid"><span>Deliverable</span><span>Client</span><span>Verifier evidence</span><span>Status</span><span>Human action</span></div>
         {details.map(({ deliverable, account, playbook, draft, verification }) => { const canProof = deliverable.status === "awaiting_proof" && verification?.result === "pass"; return <article key={deliverable.id} className="grid gap-5 border-b border-border px-6 py-6 last:border-0 lg:grid-cols-[1.2fr_.7fr_1fr_.65fr_auto] lg:items-center">
           <div className="min-w-0"><p className="font-mono text-[9px] uppercase tracking-wider text-slate">Draft v{draft?.version ?? 0} · {deliverable.channel}</p><h2 className="mt-2 font-semibold">{deliverable.title}</h2><p className="mt-3 line-clamp-2 text-sm leading-6 text-slate">“{draft?.content ?? "Draft unavailable."}”</p></div>

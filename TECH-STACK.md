@@ -11,11 +11,20 @@ justifies it. Third-party services and pricing live in [TOOLS_AND_APIS.md](TOOLS
 | Framework | Next.js 16 (App Router) + React 19 + TypeScript 5 | Server Components + Server Actions for all mutations |
 | Styling | Tailwind CSS v4 | Semantic tokens in `app/globals.css`; system in [DESIGN.md](DESIGN.md) |
 | Motion / icons | Framer Motion · Lucide React | Sparing use per design principles |
-| Auth | Supabase Auth (`@supabase/ssr`) | Cookie-based SSR sessions; middleware refresh |
-| Database | Supabase Postgres | RLS everywhere; append-only `events` via trigger; forward-only migrations |
-| Data access | `lib/galley/repository.ts` (`server-only`) | No client-side table access |
-| Validation scripts | `scripts/validate-galley-*.mjs`, `smoke-galley-supabase.mjs` | Current safety net |
+| Backend + DB | **Convex** (dev deployment `polished-crow-784`) | Schema + mutations in `convex/`; transactional mutations are the only write path. Invariants live in mutation code (no DB triggers) |
+| Auth | **Convex Auth** (`@convex-dev/auth`, Password provider) | `convex/auth.ts`; JWT keys + `SITE_URL` as Convex env vars; Next.js wired via `ConvexAuthNextjsServerProvider` + `convexAuthNextjsMiddleware` |
+| Data access | `lib/galley/convexData.ts` (`server-only`) | `authedClient()` attaches the user token for authenticated mutations |
+| Validation scripts | `scripts/validate-galley-*.mjs`, `smoke-galley-convex.mjs` | Current safety net (verifier contract + full loop + auth) |
 | Hosting | Railway (project `GALLEY`, service `galley-web`, deploys from GitHub `main`) | PR environments available via Railway PR deploys |
+
+### Convex vs. Supabase — RESOLVED (July 2026): Convex
+
+Galley runs on Convex. Supabase was fully removed (app code, client factories, npm deps). The
+accepted trade-off: the append-only `events` guarantee is enforced by **code discipline** (mutations
+are the sole write path; none patch/delete an event) rather than a Postgres UPDATE/DELETE trigger.
+If a future compliance buyer requires database-level immutability as a hard requirement, options are
+a periodic hash-chain/anchor of the event log or a mirrored append-only store — revisit then. The
+old Postgres schema with the trigger is kept in `supabase/migrations/` as historical reference.
 
 ## Phase 2 additions — real verification + multi-user
 

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import { saveOnboardingData } from "./action";
 
 type PlaybookData = {
@@ -43,7 +42,6 @@ const labelClass = "block text-sm font-medium text-ink-soft";
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<PlaybookData>(initialData);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -58,12 +56,6 @@ export default function OnboardingPage() {
       } catch {
         window.localStorage.removeItem("galley_playbook");
       }
-    }
-
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      createClient().auth.getUser().then(({ data: authData }: { data: { user: unknown } }) => {
-        setIsAuthenticated(Boolean(authData.user));
-      });
     }
 
     return () => {
@@ -95,22 +87,25 @@ export default function OnboardingPage() {
     setError("");
     window.localStorage.setItem("galley_playbook", JSON.stringify(data));
 
-    if (isAuthenticated) {
-      const result = await saveOnboardingData({
-        website: data.website,
-        name: data.client_name,
-        voice: data.brand_voice,
-        industry: data.industry,
-        target_audience: data.target_audience,
-        competitor_urls: data.competitor_urls.split("\n").map((url) => url.trim()).filter(Boolean),
-      });
-      if (!result.success) {
-        setError(result.error ?? "We could not save this playbook.");
-        setIsSaving(false);
-        return;
-      }
+    const result = await saveOnboardingData({
+      client_name: data.client_name,
+      website: data.website,
+      industry: data.industry,
+      target_audience: data.target_audience,
+      primary_offer: data.primary_offer,
+      channels: data.channels,
+      brand_voice: data.brand_voice,
+      approved_claims: data.approved_claims,
+      forbidden_claims: data.forbidden_claims,
+      reporting_kpi: data.reporting_kpi,
+    });
+    if (!result.success) {
+      setError(result.error ?? "We could not save this playbook.");
+      setIsSaving(false);
+      return;
     }
 
+    window.localStorage.removeItem("galley_playbook");
     router.push("/dashboard/proof");
   };
 

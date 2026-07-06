@@ -9,13 +9,14 @@
     "start": "next start",
     "lint": "eslint",
     "validate:galley": "node --experimental-strip-types scripts/validate-galley-node.mjs",
-    "validate:galley:persistence": "node --experimental-strip-types scripts/validate-galley-persistence.mjs",
-    "smoke:galley:supabase": "node scripts/smoke-galley-supabase.mjs"
+    "validate:galley:verifier": "node --experimental-strip-types scripts/validate-galley-verifier.mjs",
+    "smoke:galley:convex": "node scripts/smoke-galley-convex.mjs"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.97.0",
+    "@auth/core": "^0.41.1",
+    "@convex-dev/auth": "^0.0.94",
     "clsx": "^2.1.1",
+    "convex": "^1.42.1",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
