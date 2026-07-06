@@ -15,6 +15,8 @@ The governed loop: **Produce → Verify → Proof → Schedule → Report.**
 - **Domain invariant check (mock)**: `npm run validate:galley`
 - **Persistence invariant check**: `npm run validate:galley:persistence`
 - **Supabase live smoke test**: `npm run smoke:galley:supabase` (requires `.env.local` with Supabase keys)
+- **Convex live smoke test**: `npm run smoke:galley:convex` (requires `.env.local` with `NEXT_PUBLIC_CONVEX_URL`; full loop + human-gate invariant against the dev deployment)
+- **Convex deploy (dev)**: `npx convex dev --once` (uses `CONVEX_DEPLOY_KEY` from `.env.local`)
 
 There is no unit-test runner installed yet; the `validate:*` scripts are the current safety net.
 Run typecheck + build + `validate:galley` before claiming work complete.
@@ -24,7 +26,10 @@ Run typecheck + build + `validate:galley` before claiming work complete.
 - **Framework**: Next.js 16 (App Router, Server Actions), React 19, TypeScript 5
 - **Styling**: Tailwind CSS v4 (`@theme` tokens in `app/globals.css`), `clsx` + `tailwind-merge`
 - **Motion**: Framer Motion; **Icons**: Lucide React
-- **Backend**: Supabase (Auth via `@supabase/ssr`, Postgres, RLS)
+- **Backend**: Supabase (Auth via `@supabase/ssr`, Postgres, RLS). **Convex trial on `feat/convex`**:
+  domain schema + functions in `convex/` targeting dev deployment `polished-crow-784`
+  (team `dante-creed`, project `galley`); invariants enforced in mutation code since Convex has no
+  DB triggers — mutations must remain the only write path, and nothing may patch/delete `events`
 - NOT installed (do not import): shadcn/ui, Radix, react-hook-form, zod, n8n SDKs, LangChain
 
 ## Architecture map

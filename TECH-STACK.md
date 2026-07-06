@@ -13,9 +13,25 @@ justifies it. Third-party services and pricing live in [TOOLS_AND_APIS.md](TOOLS
 | Motion / icons | Framer Motion · Lucide React | Sparing use per design principles |
 | Auth | Supabase Auth (`@supabase/ssr`) | Cookie-based SSR sessions; middleware refresh |
 | Database | Supabase Postgres | RLS everywhere; append-only `events` via trigger; forward-only migrations |
+| **Backend trial** | **Convex** (branch `feat/convex`) | Schema + mutations in `convex/`; dev deployment `polished-crow-784`. Invariants live in mutation code (no DB triggers). Decision criteria below |
 | Data access | `lib/galley/repository.ts` (`server-only`) | No client-side table access |
 | Validation scripts | `scripts/validate-galley-*.mjs`, `smoke-galley-supabase.mjs` | Current safety net |
 | Hosting | Railway (project `GALLEY`, service `galley-web`, deploys from GitHub `main`) | PR environments available via Railway PR deploys |
+
+### Convex vs. Supabase decision (open — resolve before Phase 1 completes)
+
+The `feat/convex` branch ports the full domain model to Convex (verified by a live smoke test
+including the human-gate invariant). Trade-offs to weigh:
+
+- **Convex pros:** end-to-end TypeScript schema/functions, transactional mutations as the only
+  write path (invariants in one place), reactive queries for the proof queue, no SQL/TS drift.
+- **Convex cons:** append-only `events` is enforced by code discipline, not the database (Postgres
+  rejects UPDATE/DELETE via trigger — a stronger guarantee for an audit product); auth must move
+  to Convex Auth or Clerk (Supabase Auth is currently wired); RLS-style tenant isolation must be
+  reimplemented in every function via auth checks.
+- **Decision criteria:** if the audit record's DB-level immutability is a sales requirement
+  (compliance buyers), Supabase/Postgres keeps the edge; if development speed and reactive UX
+  dominate, Convex wins. Pick one before building Phase 1 tenant membership — do not maintain both.
 
 ## Phase 2 additions — real verification + multi-user
 
