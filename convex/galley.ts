@@ -441,6 +441,85 @@ export const scheduleDeliverable = mutation({
   },
 });
 
+/**
+ * Onboarding: create (or extend) a client account with a versioned playbook
+ * in the demo workspace tenant. Returns ids and the playbook version.
+ */
+export const createClientWithPlaybook = mutation({
+  args: {
+    name: v.string(),
+    website: v.string(),
+    industry: v.string(),
+    targetAudience: v.string(),
+    primaryOffer: v.string(),
+    voice: v.string(),
+    approvedClaims: v.array(v.string()),
+    forbiddenClaims: v.array(v.string()),
+    channels: v.array(v.string()),
+    reportingKpi: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const tenants = await ctx.db.query("tenants").collect();
+    let tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
+    if (!tenant) {
+      const tenantId = await ctx.db.insert("tenants", { name: MOCK_TENANT.name });
+      tenant = (await ctx.db.get(tenantId))!;
+    }
+
+    const accounts = await ctx.db
+      .query("clientAccounts")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", tenant._id))
+      .collect();
+    let account = accounts.find(
+      (a) => a.name.toLowerCase() === args.name.toLowerCase(),
+    );
+    if (!account) {
+      const accountId = await ctx.db.insert("clientAccounts", {
+        tenantId: tenant._id,
+        name: args.name,
+        website: args.website,
+        industry: args.industry,
+        targetAudience: args.targetAudience,
+        primaryOffer: args.primaryOffer,
+        status: "active",
+      });
+      account = (await ctx.db.get(accountId))!;
+      await appendEvent(ctx, {
+        tenantId: tenant._id,
+        accountId: account._id,
+        actorType: "human",
+        actorLabel: "Workspace owner",
+        type: "client_account.created",
+        subjectRef: account._id,
+        payload: { name: args.name, website: args.website },
+      });
+    }
+
+    const previous = await latestPlaybook(ctx, account._id);
+    const version = (previous?.version ?? 0) + 1;
+    const playbookId = await ctx.db.insert("playbooks", {
+      tenantId: tenant._id,
+      accountId: account._id,
+      version,
+      voice: args.voice,
+      approvedClaims: args.approvedClaims,
+      forbiddenClaims: args.forbiddenClaims,
+      channels: args.channels,
+      reportingKpi: args.reportingKpi,
+    });
+    await appendEvent(ctx, {
+      tenantId: tenant._id,
+      accountId: account._id,
+      actorType: "human",
+      actorLabel: "Workspace owner",
+      type: "playbook.created",
+      subjectRef: account._id,
+      payload: { playbookId, version },
+    });
+    return { accountId: account._id, playbookId, version };
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Demo seed / reset (validation-node prototype)
 // ---------------------------------------------------------------------------

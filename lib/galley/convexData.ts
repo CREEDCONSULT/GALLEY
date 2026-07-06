@@ -155,6 +155,21 @@ export async function resetDemo(): Promise<{ removed: number }> {
   return await client().mutation(api.galley.resetDemo, {});
 }
 
+export async function createClientWithPlaybook(input: {
+  name: string;
+  website: string;
+  industry: string;
+  targetAudience: string;
+  primaryOffer: string;
+  voice: string;
+  approvedClaims: string[];
+  forbiddenClaims: string[];
+  channels: string[];
+  reportingKpi: string;
+}): Promise<{ accountId: string; playbookId: string; version: number }> {
+  return await client().mutation(api.galley.createClientWithPlaybook, input);
+}
+
 export async function recordProofDecision(input: {
   deliverableId: string;
   userId: string;

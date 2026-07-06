@@ -1,44 +1,49 @@
-'use server'
+"use server";
 
-import { createClient } from '@/utils/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath } from "next/cache";
+import { createClientWithPlaybook, isBackendConfigured } from "@/lib/galley/convexData";
+
+function parseList(raw: string): string[] {
+  return raw
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 export async function saveOnboardingData(data: {
-    website: string
-    name?: string
-    voice: string
-    industry?: string
-    target_audience?: string
-    competitor_urls?: string[]
-}) {
-    const supabase = await createClient()
-
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-        return { error: 'Not authenticated' }
-    }
-
-    // Update profile
-    const { error } = await supabase
-        .from('profiles')
-        .update({
-            website_url: data.website,
-            full_name: data.name,
-            brand_voice_selection: data.voice,
-            industry: data.industry,
-            target_audience: data.target_audience,
-            competitor_urls: data.competitor_urls || [],
-            onboarding_completed: true,
-        })
-        .eq('id', user.id)
-
-    if (error) {
-        console.error('Error saving onboarding data:', error.message)
-        return { error: error.message }
-    }
-
-    revalidatePath('/dashboard')
-    return { success: true }
+  client_name: string;
+  website: string;
+  industry: string;
+  target_audience: string;
+  primary_offer: string;
+  channels: string[];
+  brand_voice: string;
+  approved_claims: string;
+  forbidden_claims: string;
+  reporting_kpi: string;
+}): Promise<{ success?: true; error?: string; version?: number }> {
+  if (!isBackendConfigured()) {
+    return { error: "The Convex backend is not configured." };
+  }
+  try {
+    const result = await createClientWithPlaybook({
+      name: data.client_name,
+      website: data.website,
+      industry: data.industry,
+      targetAudience: data.target_audience,
+      primaryOffer: data.primary_offer,
+      voice: data.brand_voice,
+      approvedClaims: parseList(data.approved_claims),
+      forbiddenClaims: parseList(data.forbidden_claims),
+      channels: data.channels,
+      reportingKpi: data.reporting_kpi,
+    });
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/proof");
+    return { success: true, version: result.version };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "We could not save this playbook.",
+    };
+  }
 }
