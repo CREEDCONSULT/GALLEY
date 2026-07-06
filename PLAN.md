@@ -57,7 +57,7 @@ invariant, validation/smoke scripts. Repo initiated at `github.com/CREEDCONSULT/
   Postgres; no feature ships that weakens them.
 - **No invented numbers.** Product copy and this plan only claim what's measured; research figures
   carry sources and reliability flags.
-- **One stack until it hurts.** Next.js + Supabase + Vercel; additions are phase-justified.
+- **One stack until it hurts.** Next.js + Supabase + Railway; additions are phase-justified.
 
 ## Decisions still open (owners: founder + design partners)
 

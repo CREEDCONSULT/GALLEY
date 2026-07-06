@@ -34,7 +34,7 @@ npm run smoke:galley:supabase          # live Supabase smoke test
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · Supabase (Auth, Postgres, RLS)
-· Vercel. Details: [TECH-STACK.md](TECH-STACK.md).
+· Railway. Details: [TECH-STACK.md](TECH-STACK.md).
 
 ## Documentation
 

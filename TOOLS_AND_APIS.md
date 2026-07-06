@@ -9,7 +9,7 @@ invariant** (publish gate, append-only record, claims rules) — those live in o
 | Service | Purpose | Plan / cost | Notes |
 |---|---|---|---|
 | **Supabase** | Auth, Postgres, RLS, storage | Free → Pro $25/mo/project | Append-only `events` + all domain tables |
-| **Vercel** | Hosting, preview deploys | Hobby → Pro $20/user/mo | Next.js 16 native |
+| **Railway** | Hosting (project `GALLEY`, service `galley-web` from GitHub main) | Hobby $5/mo incl. usage → Pro $20/seat/mo | Next.js auto-detected; PR deploys available |
 | **GitHub** | Repo `CREEDCONSULT/GALLEY`, CI via Actions | Free | CI: typecheck, lint, build, validate scripts |
 | **PostHog** | Product analytics, funnels (activation metrics in PRD §7) | Free tier generous | Project already provisioned (US cloud) |
 
@@ -68,7 +68,7 @@ invariant** (publish gate, append-only record, claims rules) — those live in o
 
 ## Cost envelope (pre-revenue → early revenue)
 
-- Phase 1–2 fixed: ≈ $100–150/mo (Supabase Pro, Vercel Pro, Sentry, Resend) + LLM usage
+- Phase 1–2 fixed: ≈ $80–130/mo (Supabase Pro, Railway, Sentry, Resend) + LLM usage
 - LLM verification COGS target: < $0.05 per verification run average (Haiku-first routing)
 - Gross margin guard: keep total AI COGS < 15% of MRR (SaaS median gross margin is ~77%
   [Benchmarkit 2025]; AI inference pressures this — see BUSINESS_PLAN.md §7)

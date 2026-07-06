@@ -1,6 +1,6 @@
 # Galley — Tech Stack
 
-**Principle:** one boring, vertically-integrated stack (Next.js + Supabase + Vercel) until a
+**Principle:** one boring, vertically-integrated stack (Next.js + Supabase + Railway) until a
 workload proves it needs a dedicated service. Every addition below is tied to the phase that
 justifies it. Third-party services and pricing live in [TOOLS_AND_APIS.md](TOOLS_AND_APIS.md).
 
@@ -15,14 +15,14 @@ justifies it. Third-party services and pricing live in [TOOLS_AND_APIS.md](TOOLS
 | Database | Supabase Postgres | RLS everywhere; append-only `events` via trigger; forward-only migrations |
 | Data access | `lib/galley/repository.ts` (`server-only`) | No client-side table access |
 | Validation scripts | `scripts/validate-galley-*.mjs`, `smoke-galley-supabase.mjs` | Current safety net |
-| Hosting | Vercel | Preview deployments per PR |
+| Hosting | Railway (project `GALLEY`, service `galley-web`, deploys from GitHub `main`) | PR environments available via Railway PR deploys |
 
 ## Phase 2 additions — real verification + multi-user
 
 | Need | Choice | Rationale |
 |---|---|---|
 | Schema validation | **Zod** (+ React Hook Form for playbook forms) | Shared input validation for Server Actions and API routes |
-| LLM access | **Anthropic Claude API** (primary) via Vercel AI SDK or direct SDK | LLM-graded voice/claims checks; rubric versioned per run |
+| LLM access | **Anthropic Claude API** (primary) via official SDK | LLM-graded voice/claims checks; rubric versioned per run |
 | Deterministic checks | In-repo TypeScript rules engine | Explainability requires owning the rule code; no black-box vendor |
 | Background jobs | **Supabase Edge Functions + pg_cron / Supabase Queues** first; **Inngest or Trigger.dev** when verification runs exceed request timeouts | Durable, retryable verification runs |
 | Testing | **Vitest** + Testing Library; **Playwright** for proof-queue E2E; pgTAP or script-based RLS tests | The append-only and approval invariants get dedicated tests |
