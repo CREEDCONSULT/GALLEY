@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Galley
 
-## Getting Started
+**The supervised content-ops agent for agencies and DTC teams. Proof before press.**
 
-First, run the development server:
+Galley coordinates a governed content loop — **Produce → Verify → Proof → Schedule → Report** —
+where AI drafts and verifies content against a per-client playbook (brand voice, approved and
+forbidden claims, channel rules), a human always makes the publish decision, and every input,
+check, and decision is preserved in an append-only record.
+
+## Status
+
+V1 validation node: playbook onboarding, proof queue, and a database-enforced append-only audit
+record are implemented. Real verification is the current milestone — see
+[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # add your Supabase project keys
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Useful checks:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npx tsc --noEmit                       # typecheck
+npm run lint                           # eslint
+npm run validate:galley                # domain invariants (mock)
+npm run validate:galley:persistence    # persistence invariants
+npm run smoke:galley:supabase          # live Supabase smoke test
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Stack
 
-## Learn More
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · Supabase (Auth, Postgres, RLS)
+· Vercel. Details: [TECH-STACK.md](TECH-STACK.md).
 
-To learn more about Next.js, take a look at the following resources:
+## Documentation
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Start at [PLAN.md](PLAN.md) — the master plan and document index (business plan, PRD, design
+system, tech stack, third-party APIs, implementation roadmap). Contributor guide: [CLAUDE.md](CLAUDE.md).
