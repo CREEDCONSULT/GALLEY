@@ -31,11 +31,8 @@ jobs:
       - name: Verifier rules contract
         run: npm run validate:galley:verifier
 
-      - name: Persistence invariants
-        run: npm run validate:galley:persistence
-
       - name: Production build
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          # Placeholder only — the build compiles against this but never connects.
+          NEXT_PUBLIC_CONVEX_URL: https://placeholder.convex.cloud
