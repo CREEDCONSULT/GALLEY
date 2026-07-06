@@ -13,15 +13,6 @@ export type GalleyActionResult = {
   message: string;
 };
 
-// Convex trial (feat/convex): auth is not yet wired to the Convex backend, so
-// decisions are recorded against a labeled demo reviewer. Before production,
-// this must come from an authenticated session (Convex Auth or Clerk) — the
-// PRD requires attributable actors for persisted proof decisions.
-const DEMO_REVIEWER = {
-  userId: "demo-reviewer",
-  actorLabel: "Demo reviewer (unauthenticated)",
-};
-
 function messageFrom(error: unknown): string {
   return error instanceof Error ? error.message : "An unknown persistence error occurred.";
 }
@@ -63,7 +54,7 @@ export async function resetValidationNodeDemo(): Promise<GalleyActionResult> {
 
 export async function approveDeliverableAction(deliverableId: string): Promise<GalleyActionResult> {
   try {
-    await recordProofDecision({ deliverableId, ...DEMO_REVIEWER, action: "approve" });
+    await recordProofDecision({ deliverableId, action: "approve" });
     revalidateValidationRoutes();
     return { ok: true, message: "Human approval recorded. The deliverable is approved, not published." };
   } catch (error) {
@@ -80,7 +71,6 @@ export async function editDeliverableAction(
     if (!content) return { ok: false, message: "Edited content cannot be empty." };
     const outcome = await recordProofDecision({
       deliverableId,
-      ...DEMO_REVIEWER,
       action: "edit",
       editContent: content,
     });
@@ -99,7 +89,7 @@ export async function editDeliverableAction(
 
 export async function rejectDeliverableAction(deliverableId: string): Promise<GalleyActionResult> {
   try {
-    await recordProofDecision({ deliverableId, ...DEMO_REVIEWER, action: "reject" });
+    await recordProofDecision({ deliverableId, action: "reject" });
     revalidateValidationRoutes();
     return { ok: true, message: "Human rejection recorded. This deliverable will not move forward." };
   } catch (error) {

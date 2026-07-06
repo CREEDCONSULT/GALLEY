@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
 
 // Galley domain schema. Mirrors lib/galley/types.ts.
 //
@@ -35,9 +36,22 @@ export const actorType = v.union(
 );
 
 export default defineSchema({
+  // Convex Auth tables (users, authAccounts, authSessions, …).
+  ...authTables,
+
   tenants: defineTable({
     name: v.string(),
   }),
+
+  // Workspace membership: which authenticated user belongs to which tenant,
+  // and their role. Enforces tenant isolation once auth is live.
+  memberships: defineTable({
+    userId: v.id("users"),
+    tenantId: v.id("tenants"),
+    role: v.union(v.literal("owner"), v.literal("manager"), v.literal("reviewer")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_tenant", ["tenantId"]),
 
   clientAccounts: defineTable({
     tenantId: v.id("tenants"),

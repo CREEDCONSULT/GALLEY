@@ -1,7 +1,8 @@
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { approvalAction, deliverableStatus } from "./schema";
+import { approvalAction } from "./schema";
 import { verifyDraft } from "../lib/galley/verifier";
 import {
   MOCK_CLIENT_NAMES,
@@ -102,6 +103,42 @@ async function latestVerification(
     .withIndex("by_draft", (q) => q.eq("draftId", draftId))
     .order("desc")
     .first();
+}
+
+/**
+ * Resolve the signed-in reviewer and their demo-workspace membership. On first
+ * call for a user, the membership is created (owner) — this is the interim
+ * onboarding-to-workspace link until multi-workspace management ships.
+ */
+async function requireReviewer(
+  ctx: MutationCtx,
+): Promise<{ userId: Id<"users">; label: string; tenantId: Id<"tenants"> }> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("You must be signed in to make a proof decision.");
+  const user = await ctx.db.get(userId);
+  const label =
+    (user?.name as string | undefined) ??
+    (user?.email as string | undefined) ??
+    "Reviewer";
+
+  const tenant = await ensureDemoTenant(ctx);
+  const existing = await ctx.db
+    .query("memberships")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .filter((q) => q.eq(q.field("tenantId"), tenant._id))
+    .first();
+  if (!existing) {
+    await ctx.db.insert("memberships", { userId, tenantId: tenant._id, role: "owner" });
+  }
+  return { userId, label, tenantId: tenant._id };
+}
+
+async function ensureDemoTenant(ctx: MutationCtx): Promise<Doc<"tenants">> {
+  const tenants = await ctx.db.query("tenants").collect();
+  const found = tenants.find((t) => t.name === MOCK_TENANT.name);
+  if (found) return found;
+  const tenantId = await ctx.db.insert("tenants", { name: MOCK_TENANT.name });
+  return (await ctx.db.get(tenantId))!;
 }
 
 async function assertApprovalExists(
@@ -358,13 +395,13 @@ export const recordVerification = mutation({
 export const recordProofDecision = mutation({
   args: {
     deliverableId: v.id("deliverables"),
-    userId: v.string(),
-    actorLabel: v.string(),
     action: approvalAction,
     editContent: v.optional(v.string()),
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Invariant: proof decisions require an authenticated, attributable actor.
+    const reviewer = await requireReviewer(ctx);
     const deliverable = await ctx.db.get(args.deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
     if (deliverable.status !== "awaiting_proof") {
@@ -383,7 +420,7 @@ export const recordProofDecision = mutation({
     const approvalId = await ctx.db.insert("approvals", {
       tenantId: deliverable.tenantId,
       deliverableId: args.deliverableId,
-      userId: args.userId,
+      userId: reviewer.userId,
       action: args.action,
       editDiff,
     });
@@ -391,10 +428,10 @@ export const recordProofDecision = mutation({
       tenantId: deliverable.tenantId,
       accountId: deliverable.accountId,
       actorType: "human",
-      actorLabel: args.actorLabel,
+      actorLabel: reviewer.label,
       type: `approval.${args.action === "approve" ? "approved" : args.action === "reject" ? "rejected" : "edited"}`,
       subjectRef: args.deliverableId,
-      payload: { approvalId, userId: args.userId, editDiff, note: args.note ?? null },
+      payload: { approvalId, userId: reviewer.userId, editDiff, note: args.note ?? null },
     });
 
     if (args.action === "approve") {
@@ -897,4 +934,16 @@ export const getRecord = query({
       .query("events")
       .withIndex("by_subject", (q) => q.eq("subjectRef", args.subjectRef))
       .collect(),
+});
+
+/** The signed-in user's public identity, or null when unauthenticated. */
+export const currentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+    return { name: user.name ?? null, email: user.email ?? null };
+  },
 });

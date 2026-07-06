@@ -1,6 +1,7 @@
 import "server-only";
 
 import { ConvexHttpClient } from "convex/browser";
+import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type {
@@ -27,6 +28,14 @@ function client(): ConvexHttpClient {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured.");
   return new ConvexHttpClient(url);
+}
+
+/** Convex client carrying the signed-in user's token, for authenticated mutations. */
+async function authedClient(): Promise<ConvexHttpClient> {
+  const instance = client();
+  const token = await convexAuthNextjsToken();
+  if (token) instance.setAuth(token);
+  return instance;
 }
 
 const toIso = (ms: number) => new Date(ms).toISOString();
@@ -197,14 +206,21 @@ export async function createClientWithPlaybook(input: {
 
 export async function recordProofDecision(input: {
   deliverableId: string;
-  userId: string;
-  actorLabel: string;
   action: ApprovalAction;
   editContent?: string;
   note?: string;
 }): Promise<{ status: string; draftVersion?: number; result?: "pass" | "fail" }> {
-  return await client().mutation(api.galley.recordProofDecision, {
+  const convex = await authedClient();
+  return await convex.mutation(api.galley.recordProofDecision, {
     ...input,
     deliverableId: input.deliverableId as Id<"deliverables">,
   });
+}
+
+/** The signed-in reviewer's display identity, or null if unauthenticated. */
+export async function getCurrentReviewer(): Promise<{ name: string; email: string } | null> {
+  const convex = await authedClient();
+  const user = await convex.query(api.galley.currentUser, {});
+  if (!user) return null;
+  return { name: user.name ?? user.email ?? "Reviewer", email: user.email ?? "" };
 }

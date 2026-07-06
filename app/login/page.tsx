@@ -1,16 +1,36 @@
-export const dynamic = "force-dynamic";
+"use client";
 
-import type { ComponentProps } from "react";
+import { type ComponentProps, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Mail, ShieldCheck } from "lucide-react";
-import { login } from "./action";
+import { useRouter } from "next/navigation";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { ArrowRight, Lock, Mail, ShieldCheck, User } from "lucide-react";
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ message?: string; error?: string }>;
-}) {
-  const params = await searchParams;
+export default function LoginPage() {
+  const { signIn } = useAuthActions();
+  const router = useRouter();
+  const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPending(true);
+    setError("");
+    const formData = new FormData(event.currentTarget);
+    formData.set("flow", flow);
+    try {
+      await signIn("password", formData);
+      router.push("/dashboard/proof");
+    } catch {
+      setError(
+        flow === "signIn"
+          ? "Could not sign in. Check your email and password."
+          : "Could not create the account. Passwords must be at least 8 characters.",
+      );
+      setPending(false);
+    }
+  };
 
   return (
     <div className="rule-grid flex min-h-screen items-center justify-center bg-background p-5 text-foreground">
@@ -26,22 +46,54 @@ export default async function LoginPage({
         <div className="border border-border bg-surface p-7 shadow-[12px_12px_0_0_#0b0b0a] md:p-9">
           <div className="border-b border-border pb-6">
             <p className="eyebrow">Workspace access</p>
-            <h1 className="editorial-display mt-3 text-4xl">Welcome back.</h1>
-            <p className="mt-3 text-sm leading-6 text-muted">Enter your email and we’ll send a secure sign-in link.</p>
+            <h1 className="editorial-display mt-3 text-4xl">
+              {flow === "signIn" ? "Welcome back." : "Create your workspace."}
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-muted">
+              {flow === "signIn"
+                ? "Sign in to review the proof queue and make attributable decisions."
+                : "Your name is recorded on every proof decision you make."}
+            </p>
           </div>
 
-          <form action={login} className="mt-6 space-y-5">
-            <Label htmlFor="email">Email address</Label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate" size={16} />
-              <Input id="email" name="email" type="email" placeholder="name@agency.com" required className="pl-10" />
+          <form onSubmit={onSubmit} className="mt-6 space-y-5">
+            {flow === "signUp" && (
+              <div>
+                <Label htmlFor="name">Full name</Label>
+                <div className="relative mt-2">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate" size={16} />
+                  <Input id="name" name="name" type="text" placeholder="Dana Reyes" required className="pl-10" />
+                </div>
+              </div>
+            )}
+            <div>
+              <Label htmlFor="email">Email address</Label>
+              <div className="relative mt-2">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate" size={16} />
+                <Input id="email" name="email" type="email" placeholder="name@agency.com" required className="pl-10" />
+              </div>
             </div>
-            <Button type="submit">
-              Send secure link <ArrowRight size={15} />
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <div className="relative mt-2">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate" size={16} />
+                <Input id="password" name="password" type="password" placeholder="At least 8 characters" required minLength={8} className="pl-10" />
+              </div>
+            </div>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Working…" : flow === "signIn" ? "Sign in" : "Create workspace"}
+              <ArrowRight size={15} />
             </Button>
-            {params.message && <p className="border border-success/35 bg-success/5 p-3 text-center text-sm text-success">{params.message}</p>}
-            {params.error && <p className="border border-danger/35 bg-danger/5 p-3 text-center text-sm text-danger">{params.error}</p>}
+            {error && <p className="border border-danger/35 bg-danger/5 p-3 text-center text-sm text-danger">{error}</p>}
           </form>
+
+          <button
+            type="button"
+            onClick={() => { setFlow(flow === "signIn" ? "signUp" : "signIn"); setError(""); }}
+            className="mt-5 w-full text-center text-xs text-slate transition-colors hover:text-foreground"
+          >
+            {flow === "signIn" ? "No workspace yet? Create one." : "Already have a workspace? Sign in."}
+          </button>
 
           <div className="mt-7 flex items-start gap-3 border-t border-border pt-5 text-xs leading-5 text-slate">
             <ShieldCheck size={14} className="mt-0.5 shrink-0 text-primary" />
@@ -62,5 +114,5 @@ function Input(props: ComponentProps<"input">) {
 }
 
 function Button(props: ComponentProps<"button">) {
-  return <button {...props} className={`flex h-12 w-full items-center justify-center gap-2 bg-primary px-4 text-sm font-semibold text-background transition-colors hover:bg-primary-strong ${props.className ?? ""}`} />;
+  return <button {...props} className={`flex h-12 w-full items-center justify-center gap-2 bg-primary px-4 text-sm font-semibold text-background transition-colors hover:bg-primary-strong disabled:opacity-50 ${props.className ?? ""}`} />;
 }

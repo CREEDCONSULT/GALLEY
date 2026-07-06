@@ -8,10 +8,10 @@ import {
   FileUp,
   Fingerprint,
   LayoutDashboard,
-  LockKeyhole,
   Settings,
   ShieldCheck,
 } from "lucide-react";
+import { SignOutButton } from "@/components/galley/SignOutButton";
 
 const navigation = [
   { name: "Proof queue", href: "/dashboard/proof", icon: ClipboardCheck },
@@ -57,9 +57,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard/settings" className="flex items-center gap-3 px-3 py-3 text-sm text-muted transition-colors hover:text-foreground">
             <Settings size={17} /> Settings
           </Link>
-          <Link href="/login" className="flex w-full items-center gap-3 px-3 py-3 text-sm text-muted transition-colors hover:text-foreground">
-            <LockKeyhole size={17} /> Workspace access
-          </Link>
+          <SignOutButton />
         </div>
       </aside>
 

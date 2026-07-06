@@ -11,27 +11,20 @@ justifies it. Third-party services and pricing live in [TOOLS_AND_APIS.md](TOOLS
 | Framework | Next.js 16 (App Router) + React 19 + TypeScript 5 | Server Components + Server Actions for all mutations |
 | Styling | Tailwind CSS v4 | Semantic tokens in `app/globals.css`; system in [DESIGN.md](DESIGN.md) |
 | Motion / icons | Framer Motion · Lucide React | Sparing use per design principles |
-| Auth | Supabase Auth (`@supabase/ssr`) | Cookie-based SSR sessions; middleware refresh |
-| Database | Supabase Postgres | RLS everywhere; append-only `events` via trigger; forward-only migrations |
-| **Backend trial** | **Convex** (branch `feat/convex`) | Schema + mutations in `convex/`; dev deployment `polished-crow-784`. Invariants live in mutation code (no DB triggers). Decision criteria below |
-| Data access | `lib/galley/repository.ts` (`server-only`) | No client-side table access |
-| Validation scripts | `scripts/validate-galley-*.mjs`, `smoke-galley-supabase.mjs` | Current safety net |
+| Backend + DB | **Convex** (dev deployment `polished-crow-784`) | Schema + mutations in `convex/`; transactional mutations are the only write path. Invariants live in mutation code (no DB triggers) |
+| Auth | **Convex Auth** (`@convex-dev/auth`, Password provider) | `convex/auth.ts`; JWT keys + `SITE_URL` as Convex env vars; Next.js wired via `ConvexAuthNextjsServerProvider` + `convexAuthNextjsMiddleware` |
+| Data access | `lib/galley/convexData.ts` (`server-only`) | `authedClient()` attaches the user token for authenticated mutations |
+| Validation scripts | `scripts/validate-galley-*.mjs`, `smoke-galley-convex.mjs` | Current safety net (verifier contract + full loop + auth) |
 | Hosting | Railway (project `GALLEY`, service `galley-web`, deploys from GitHub `main`) | PR environments available via Railway PR deploys |
 
-### Convex vs. Supabase decision (open — resolve before Phase 1 completes)
+### Convex vs. Supabase — RESOLVED (July 2026): Convex
 
-The `feat/convex` branch ports the full domain model to Convex (verified by a live smoke test
-including the human-gate invariant). Trade-offs to weigh:
-
-- **Convex pros:** end-to-end TypeScript schema/functions, transactional mutations as the only
-  write path (invariants in one place), reactive queries for the proof queue, no SQL/TS drift.
-- **Convex cons:** append-only `events` is enforced by code discipline, not the database (Postgres
-  rejects UPDATE/DELETE via trigger — a stronger guarantee for an audit product); auth must move
-  to Convex Auth or Clerk (Supabase Auth is currently wired); RLS-style tenant isolation must be
-  reimplemented in every function via auth checks.
-- **Decision criteria:** if the audit record's DB-level immutability is a sales requirement
-  (compliance buyers), Supabase/Postgres keeps the edge; if development speed and reactive UX
-  dominate, Convex wins. Pick one before building Phase 1 tenant membership — do not maintain both.
+Galley runs on Convex. Supabase was fully removed (app code, client factories, npm deps). The
+accepted trade-off: the append-only `events` guarantee is enforced by **code discipline** (mutations
+are the sole write path; none patch/delete an event) rather than a Postgres UPDATE/DELETE trigger.
+If a future compliance buyer requires database-level immutability as a hard requirement, options are
+a periodic hash-chain/anchor of the event log or a mirrored append-only store — revisit then. The
+old Postgres schema with the trigger is kept in `supabase/migrations/` as historical reference.
 
 ## Phase 2 additions — real verification + multi-user
 

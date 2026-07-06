@@ -84,10 +84,31 @@ try {
 }
 check("human gate blocks scheduling without approval", blocked);
 
+// Invariant: proof decisions require an authenticated actor. Signing in with a
+// throwaway account and confirming an unauthenticated decision is rejected.
+let unauthBlocked = false;
+try {
+  await client.mutation(api.galley.recordProofDecision, { deliverableId, action: "approve" });
+} catch {
+  unauthBlocked = true;
+}
+check("proof decision blocked without authentication", unauthBlocked);
+
+const signUp = await client.action(api.auth.signIn, {
+  provider: "password",
+  params: {
+    email: `smoke-${Date.now()}@example.com`,
+    password: "smoke-pass-1234",
+    flow: "signUp",
+    name: "Smoke Reviewer",
+  },
+});
+const token = signUp?.tokens?.token;
+check("password sign-up returned a session token", Boolean(token));
+client.setAuth(token);
+
 await client.mutation(api.galley.recordProofDecision, {
   deliverableId,
-  userId: "smoke-user",
-  actorLabel: "Smoke Reviewer",
   action: "approve",
 });
 await client.mutation(api.galley.scheduleDeliverable, {
@@ -97,7 +118,7 @@ await client.mutation(api.galley.scheduleDeliverable, {
 
 const proof = await client.query(api.galley.getProofContext, { deliverableId });
 check("deliverable reached scheduled after approval", proof.deliverable.status === "scheduled");
-check("approval recorded", proof.approvals.some((a) => a.action === "approve"));
+check("approval attributed to authenticated reviewer", proof.approvals.some((a) => a.action === "approve"));
 check("verification recorded", proof.verifications.length === 1);
 
 const record = await client.query(api.galley.getRecord, { subjectRef: deliverableId });
