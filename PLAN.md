@@ -34,30 +34,38 @@ This document is the index and the one-page strategy. Everything else is a level
 
 ## Where we are (July 2026)
 
-**Built:** Next.js 16 + Supabase validation node — playbook onboarding, proof queue, records view,
-domain schema with RLS and a database-enforced append-only event log, approval-before-scheduling
-invariant, validation/smoke scripts. Repo initiated at `github.com/CREEDCONSULT/GALLEY`.
+**Built and deployed:** Next.js 16 + **Convex** validation node, live at
+`https://galley-web-production.up.railway.app` (Railway, auto-deploys from `main`). Playbook
+onboarding, draft intake, proof queue, records view; append-only event log enforced in Convex
+mutations; approval-before-scheduling invariant. **Deterministic verifier v0** (`galley-rules-v0.2`)
+runs inside mutations — forbidden-claim/channel/substance/substantiation checks with cited evidence.
+**Convex Auth** (email+password): routes protected, proof decisions require an authenticated actor
+and attribute to the real user in the record (verified live in production).
 
-**Not built:** real verification, generation, multi-user workspaces, billing, publishing, reporting.
+**Not built:** LLM-graded verification + eval harness, generation, billing, publishing, reporting;
+full per-function tenant isolation on create paths; a production (non-dev) Convex deployment.
+
+**Resolved decisions:** backend = Convex (Supabase removed), auth = Convex Auth, hosting = Railway.
 
 ## The immediate path (from IMPLEMENTATION_PLAN.md)
 
-1. **Phase 0 (days):** repo hygiene, CI, this document set. ✅ largely complete
-2. **Phase 1 (1–2 wks):** finish persistence, tenant membership + full RLS, invariant test suite.
-3. **Phase 2 (4–6 wks) — the bet:** real verification engine (rules + LLM-graded), golden eval
-   set, 5–10 design partners. *Kill/continue gate: partners run real drafts weekly and the
-   verifier hits ≥90% recall / ≤10% false-block.*
+1. **Phase 0 (days):** repo hygiene, CI, this document set. ✅ complete
+2. **Phase 1 — backend + auth on Convex, deployed. ✅ mostly complete** (remaining: full
+   per-function tenant isolation on create paths; automated invariant test suite).
+3. **Phase 2 (4–6 wks) — the bet:** deterministic verifier v0 shipped; next is LLM-graded checks +
+   a golden eval set and 5–10 design partners. *Kill/continue gate: partners run real drafts weekly
+   and the verifier hits ≥90% recall / ≤10% false-block.*
 4. **Phase 3:** Stripe billing + supervised generation → first paying workspaces.
 5. **Phases 4–5:** publish integrations + client portal, then reporting and audit exports.
 
 ## Operating principles
 
 - **Verification quality is the product.** No phase overlaps Phase 2's eval gates.
-- **Invariants are release gates.** Human publish gate and append-only record are enforced in
-  Postgres; no feature ships that weakens them.
+- **Invariants are release gates.** The human publish gate and append-only record are enforced in
+  Convex mutations (the sole write path); no feature ships that weakens them.
 - **No invented numbers.** Product copy and this plan only claim what's measured; research figures
   carry sources and reliability flags.
-- **One stack until it hurts.** Next.js + Supabase + Railway; additions are phase-justified.
+- **One stack until it hurts.** Next.js + Convex + Railway; additions are phase-justified.
 
 ## Decisions still open (owners: founder + design partners)
 

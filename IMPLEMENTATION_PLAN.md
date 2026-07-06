@@ -11,37 +11,39 @@ Timeboxes assume a solo founder with AI-assisted development; treat them as sequ
 ## Phase 0 — Repo initiation & hygiene (days)
 
 - [x] Point origin at `https://github.com/CREEDCONSULT/GALLEY.git` and push `main`.
-- [ ] Archive legacy ContentFlow AI docs to `docs/legacy/`; remove multi-MB text/docx blobs from
-      the working tree (keep in history or move out of repo).
-- [ ] CI on GitHub Actions: `tsc --noEmit`, `eslint`, `next build`, `validate:galley`.
-- [ ] Rewritten CLAUDE.md / DESIGN.md / PRD / TECH-STACK / TOOLS_AND_APIS / BUSINESS_PLAN / PLAN
-      committed (this document set).
-- [ ] `.env.example` updated to actual required vars; Supabase project linked; migrations applied.
+- [x] Archive legacy ContentFlow AI docs to `docs/legacy/`.
+- [x] CI on GitHub Actions: `tsc --noEmit`, `eslint`, `next build`, `validate:galley*`.
+- [x] Rewritten CLAUDE.md / DESIGN.md / PRD / TECH-STACK / TOOLS_AND_APIS / BUSINESS_PLAN / PLAN.
+- [x] `.env.example` updated to actual required vars (Convex).
 
-**Exit:** clean repo on GALLEY.git with green CI.
+**Exit:** clean repo on GALLEY.git with green CI. ✅ complete
 
-## Phase 1 — Harden the validation node (1–2 weeks)
+## Phase 1 — Backend + auth on Convex, deployed (mostly complete)
 
-The prototype exists; make it trustworthy.
+The prototype is now a persisted, authenticated, deployed app.
 
 **Workstreams**
-1. **Persistence completion** — playbook CRUD writes real `playbooks` rows (versioned); proof
-   decisions and events fully persisted (no local-only actions left); demo seed/reset isolated.
-2. **Workspace security** — tenant-membership table + full RLS policies (currently secure-default
-   with no browser policies); role model: owner / manager / reviewer.
-3. **Test harness** — Vitest + RLS test suite; DB tests proving `events` is append-only and the
-   approval-before-scheduling invariant holds server-side; Playwright happy-path for the proof queue.
-4. **Type generation** — `supabase gen types typescript` wired into `types/supabase.ts`.
+1. [x] **Backend on Convex** — schema + mutations in `convex/`; playbooks versioned; proof
+   decisions, drafts, verifications, and events fully persisted; demo seed/reset. Supabase removed.
+2. [x] **Auth** — Convex Auth (Password); `memberships` table (owner/manager/reviewer); routes
+   protected by middleware; proof decisions require an authenticated actor and attribute to the
+   real user. *(Remaining: enforce per-user tenant scoping on the create paths — onboarding and
+   intake — not just proof decisions.)*
+3. [x] **Deploy** — Railway `galley-web` live from `main`; verified in production (sign up →
+   protected proof queue → attributed approval in the record).
+4. [ ] **Test harness** — Vitest + Playwright + an automated append-only / approval-gate / tenant
+   isolation suite in CI (currently covered by `smoke:galley:convex` + `validate:galley*`).
 
-**Exit criteria:** two workspaces provably isolated; all invariant tests green in CI; a real user
-can sign up → playbook → seeded deliverable → proof decision → record, all persisted.
-**Kill/continue:** n/a — this is table stakes.
+**Exit criteria:** two workspaces provably isolated; automated invariant tests green in CI.
+**Status:** live user flow works end-to-end in production; automated isolation tests still to add.
 
 ## Phase 2 — Real verification engine (4–6 weeks) ← the bet
 
 **Workstreams**
-1. **Rules engine (deterministic)** — forbidden-claim exact/fuzzy match, required disclosures,
-   banned vocabulary, channel length limits, link policy. Versioned rubric; findings cite rules.
+1. [x] **Rules engine (deterministic)** — `lib/galley/verifier.ts`, rubric `galley-rules-v0.2`:
+   forbidden-claim fuzzy match, channel policy, substance check, FTC substantiation-risk warnings,
+   approved-claim evidence notes. 8-check contract in CI. *(Next: required disclosures, link policy,
+   channel length limits.)*
 2. **LLM-graded checks** — voice adherence + claim-paraphrase detection (Claude; Haiku-first
    routing). Model + rubric version stamped on every run.
 3. **Eval harness** — golden set of real violations (seeded from design partners); measure
