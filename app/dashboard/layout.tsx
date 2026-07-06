@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   ClipboardCheck,
+  FileUp,
   Fingerprint,
   LayoutDashboard,
   LockKeyhole,
@@ -14,6 +15,7 @@ import {
 
 const navigation = [
   { name: "Proof queue", href: "/dashboard/proof", icon: ClipboardCheck },
+  { name: "Submit draft", href: "/dashboard/intake", icon: FileUp },
   { name: "Playbooks", href: "/onboarding", icon: BookOpen },
   { name: "Records", href: "/dashboard/records", icon: Fingerprint },
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },

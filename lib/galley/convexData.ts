@@ -155,6 +155,31 @@ export async function resetDemo(): Promise<{ removed: number }> {
   return await client().mutation(api.galley.resetDemo, {});
 }
 
+export async function listAccountsWithPlaybooks(): Promise<
+  Array<{ account: ClientAccount; playbook: Playbook | null }>
+> {
+  const rows = await client().query(api.galley.listAccounts, {});
+  return rows.map((row) => ({
+    account: mapAccount(row.account),
+    playbook: row.playbook ? mapPlaybook(row.playbook) : null,
+  }));
+}
+
+export async function intakeDraft(input: {
+  accountId: string;
+  title: string;
+  type: string;
+  channel: string;
+  period: string;
+  content: string;
+  source: string;
+}): Promise<{ deliverableId: string; result: "pass" | "fail" }> {
+  return await client().mutation(api.galley.intakeDraft, {
+    ...input,
+    accountId: input.accountId as Id<"clientAccounts">,
+  });
+}
+
 export async function createClientWithPlaybook(input: {
   name: string;
   website: string;

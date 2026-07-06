@@ -442,6 +442,101 @@ export const scheduleDeliverable = mutation({
 });
 
 /**
+ * Draft intake: bring an externally produced draft into the governed loop.
+ * Creates the deliverable, attaches the immutable draft, and verifies it
+ * against the client playbook — one transaction, no bypass path.
+ */
+export const intakeDraft = mutation({
+  args: {
+    accountId: v.id("clientAccounts"),
+    title: v.string(),
+    type: v.string(),
+    channel: v.string(),
+    period: v.string(),
+    content: v.string(),
+    source: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.accountId);
+    if (!account) throw new Error("Client account not found");
+    const playbook = await latestPlaybook(ctx, args.accountId);
+    if (!playbook) throw new Error("Create a playbook for this client before submitting drafts.");
+
+    const deliverableId = await ctx.db.insert("deliverables", {
+      tenantId: account.tenantId,
+      accountId: args.accountId,
+      period: args.period,
+      type: args.type,
+      channel: args.channel,
+      title: args.title,
+      status: "drafting",
+    });
+    const deliverable = (await ctx.db.get(deliverableId))!;
+    await appendEvent(ctx, {
+      tenantId: account.tenantId,
+      accountId: args.accountId,
+      actorType: "human",
+      actorLabel: args.source,
+      type: "deliverable.created",
+      subjectRef: deliverableId,
+      payload: { title: args.title, channel: args.channel, intake: true },
+    });
+    await appendEvent(ctx, {
+      tenantId: account.tenantId,
+      accountId: args.accountId,
+      actorType: "system",
+      actorLabel: "Galley",
+      type: "playbook.selected",
+      subjectRef: deliverableId,
+      payload: { playbookId: playbook._id, playbookVersion: playbook.version },
+    });
+
+    const draftId = await ctx.db.insert("drafts", {
+      tenantId: account.tenantId,
+      deliverableId,
+      version: 1,
+      title: args.title,
+      content: args.content,
+      model: args.source,
+      playbookVersion: playbook.version,
+    });
+    await appendEvent(ctx, {
+      tenantId: account.tenantId,
+      accountId: args.accountId,
+      actorType: "human",
+      actorLabel: args.source,
+      type: "draft.generated",
+      subjectRef: deliverableId,
+      payload: { draftId, draftVersion: 1, model: args.source, intake: true },
+    });
+    await transition(ctx, deliverable, "verifying");
+    const draft = (await ctx.db.get(draftId))!;
+    const result = await runVerification(ctx, deliverable, draft, playbook);
+    return { deliverableId, result };
+  },
+});
+
+/** Client accounts in the demo workspace with their latest playbook. */
+export const listAccounts = query({
+  args: {},
+  handler: async (ctx) => {
+    const tenants = await ctx.db.query("tenants").collect();
+    const tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
+    if (!tenant) return [];
+    const accounts = await ctx.db
+      .query("clientAccounts")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", tenant._id))
+      .collect();
+    return await Promise.all(
+      accounts.map(async (account) => ({
+        account,
+        playbook: await latestPlaybook(ctx, account._id),
+      })),
+    );
+  },
+});
+
+/**
  * Onboarding: create (or extend) a client account with a versioned playbook
  * in the demo workspace tenant. Returns ids and the playbook version.
  */
