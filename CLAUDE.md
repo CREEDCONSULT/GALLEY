@@ -13,6 +13,7 @@ The governed loop: **Produce → Verify → Proof → Schedule → Report.**
 - **Lint**: `npm run lint`
 - **Type check**: `npx tsc --noEmit`
 - **Domain invariant check (mock)**: `npm run validate:galley`
+- **Verifier rules contract**: `npm run validate:galley:verifier`
 - **Persistence invariant check**: `npm run validate:galley:persistence`
 - **Supabase live smoke test**: `npm run smoke:galley:supabase` (requires `.env.local` with Supabase keys)
 - **Convex live smoke test**: `npm run smoke:galley:convex` (requires `.env.local` with `NEXT_PUBLIC_CONVEX_URL`; full loop + human-gate invariant against the dev deployment)
@@ -39,7 +40,11 @@ Run typecheck + build + `validate:galley` before claiming work complete.
 - `lib/galley/types.ts` — canonical domain types (Tenant, ClientAccount, Playbook, Deliverable,
   Draft, Verification, Approval, Event)
 - `lib/galley/invariants.ts` — domain invariants (approval-before-scheduling)
-- `lib/galley/repository.ts` — server-only Supabase data access
+- `lib/galley/verifier.ts` — deterministic verification rules engine (pure; shared by app,
+  Convex functions, and validation scripts; rubric-versioned)
+- `lib/galley/repository.ts` — server-only Supabase data access (main branch path)
+- `lib/galley/convexData.ts` — server-only Convex facade (feat/convex path; maps Convex docs to
+  canonical types)
 - `lib/galley/mockValidationNode.ts` — deterministic mock state for the V1 prototype
 - `utils/supabase/{client,server,middleware}.ts` — Supabase client factories
 - `supabase/migrations/` — schema; `20260629_galley_validation_node.sql` is the core domain schema

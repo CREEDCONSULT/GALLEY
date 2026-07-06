@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "validate:galley": "node --experimental-strip-types scripts/validate-galley-node.mjs",
+    "validate:galley:verifier": "node --experimental-strip-types scripts/validate-galley-verifier.mjs",
     "validate:galley:persistence": "node --experimental-strip-types scripts/validate-galley-persistence.mjs",
     "smoke:galley:supabase": "node scripts/smoke-galley-supabase.mjs",
     "smoke:galley:convex": "node scripts/smoke-galley-convex.mjs"

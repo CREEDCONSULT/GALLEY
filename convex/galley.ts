@@ -1,20 +1,29 @@
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { approvalAction, deliverableStatus } from "./schema";
+import { verifyDraft } from "../lib/galley/verifier";
+import {
+  MOCK_CLIENT_NAMES,
+  MOCK_TENANT,
+  createMockClientAccount,
+  createMockPlaybook,
+  generateMockDeliverables,
+} from "../lib/galley/mockValidationNode";
 
 // Galley validation-node functions.
 //
-// These mutations are the ONLY write path to the domain tables. The two core
+// These mutations are the ONLY write path to the domain tables. The core
 // invariants live here (Convex has no DB triggers):
 // 1. Human gate: `scheduled`/`published` require a recorded human `approve`.
 // 2. Append-only record: events are inserted, never patched or deleted, and
 //    every state change appends one.
+// 3. Drafts and verifications are immutable versions.
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   drafting: ["verifying"],
   verifying: ["awaiting_proof", "escalated"],
-  awaiting_proof: ["approved", "rejected", "drafting", "escalated"],
+  awaiting_proof: ["approved", "rejected", "verifying", "escalated"],
   approved: ["scheduled"],
   scheduled: ["published"],
   published: [],
@@ -28,19 +37,71 @@ function assertTransition(from: string, to: string): void {
   }
 }
 
-async function appendEvent(
-  ctx: MutationCtx,
-  event: {
-    tenantId: Id<"tenants">;
-    accountId: Id<"clientAccounts">;
-    actorType: "system" | "generator" | "verifier" | "human";
-    actorLabel: string;
-    type: string;
-    subjectRef: string;
-    payload: unknown;
-  },
-): Promise<void> {
+type EventInput = {
+  tenantId: Id<"tenants">;
+  accountId: Id<"clientAccounts">;
+  actorType: "system" | "generator" | "verifier" | "human";
+  actorLabel: string;
+  type: string;
+  subjectRef: string;
+  payload: unknown;
+};
+
+async function appendEvent(ctx: MutationCtx, event: EventInput): Promise<void> {
   await ctx.db.insert("events", event);
+}
+
+async function transition(
+  ctx: MutationCtx,
+  deliverable: Doc<"deliverables">,
+  to: Doc<"deliverables">["status"],
+  actorLabel = "Galley",
+): Promise<void> {
+  assertTransition(deliverable.status, to);
+  await ctx.db.patch(deliverable._id, { status: to });
+  await appendEvent(ctx, {
+    tenantId: deliverable.tenantId,
+    accountId: deliverable.accountId,
+    actorType: "system",
+    actorLabel,
+    type: "deliverable.status_changed",
+    subjectRef: deliverable._id,
+    payload: { from: deliverable.status, to },
+  });
+  deliverable.status = to;
+}
+
+async function latestPlaybook(
+  ctx: QueryCtx | MutationCtx,
+  accountId: Id<"clientAccounts">,
+): Promise<Doc<"playbooks"> | null> {
+  return await ctx.db
+    .query("playbooks")
+    .withIndex("by_account", (q) => q.eq("accountId", accountId))
+    .order("desc")
+    .first();
+}
+
+async function latestDraft(
+  ctx: QueryCtx | MutationCtx,
+  deliverableId: Id<"deliverables">,
+): Promise<Doc<"drafts"> | null> {
+  return await ctx.db
+    .query("drafts")
+    .withIndex("by_deliverable", (q) => q.eq("deliverableId", deliverableId))
+    .order("desc")
+    .first();
+}
+
+async function latestVerification(
+  ctx: QueryCtx | MutationCtx,
+  draftId: Id<"drafts">,
+): Promise<Doc<"verifications"> | null> {
+  return await ctx.db
+    .query("verifications")
+    .withIndex("by_draft", (q) => q.eq("draftId", draftId))
+    .order("desc")
+    .first();
 }
 
 async function assertApprovalExists(
@@ -56,6 +117,56 @@ async function assertApprovalExists(
       `Deliverable ${deliverableId} cannot be scheduled or published without a recorded human approval.`,
     );
   }
+}
+
+/** Run the deterministic verifier, persist the result, and move the deliverable. */
+async function runVerification(
+  ctx: MutationCtx,
+  deliverable: Doc<"deliverables">,
+  draft: Doc<"drafts">,
+  playbook: Doc<"playbooks">,
+): Promise<Doc<"verifications">["result"]> {
+  const report = verifyDraft(
+    { content: draft.content, channel: deliverable.channel },
+    playbook,
+  );
+  const verificationId = await ctx.db.insert("verifications", {
+    tenantId: deliverable.tenantId,
+    draftId: draft._id,
+    result: report.result,
+    reasons: report.reasons,
+    rubricVersion: report.rubricVersion,
+  });
+  await appendEvent(ctx, {
+    tenantId: deliverable.tenantId,
+    accountId: deliverable.accountId,
+    actorType: "verifier",
+    actorLabel: `Galley verifier (${report.rubricVersion})`,
+    type: report.result === "pass" ? "verification.passed" : "verification.failed",
+    subjectRef: deliverable._id,
+    payload: {
+      verificationId,
+      draftId: draft._id,
+      result: report.result,
+      reasons: report.reasons,
+      findings: report.findings,
+      rubricVersion: report.rubricVersion,
+    },
+  });
+  const next = report.result === "pass" ? "awaiting_proof" : "escalated";
+  await transition(ctx, deliverable, next);
+  if (next === "awaiting_proof") {
+    await appendEvent(ctx, {
+      tenantId: deliverable.tenantId,
+      accountId: deliverable.accountId,
+      actorType: "system",
+      actorLabel: "Galley",
+      type: "proof.awaiting",
+      subjectRef: deliverable._id,
+      payload: { verificationId, draftId: draft._id },
+    });
+  }
+  return report.result;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,13 +216,7 @@ export const createPlaybook = mutation({
     reportingKpi: v.string(),
   },
   handler: async (ctx, args) => {
-    // Playbooks are versioned: a new playbook for an account supersedes by
-    // version number; prior versions are never mutated.
-    const latest = await ctx.db
-      .query("playbooks")
-      .withIndex("by_account", (q) => q.eq("accountId", args.accountId))
-      .order("desc")
-      .first();
+    const latest = await latestPlaybook(ctx, args.accountId);
     const version = (latest?.version ?? 0) + 1;
     const playbookId = await ctx.db.insert("playbooks", { ...args, version });
     await appendEvent(ctx, {
@@ -149,7 +254,7 @@ export const createDeliverable = mutation({
       tenantId: args.tenantId,
       accountId: args.accountId,
       actorType: "system",
-      actorLabel: "galley",
+      actorLabel: "Galley",
       type: "deliverable.created",
       subjectRef: deliverableId,
       payload: { title: args.title, channel: args.channel },
@@ -169,14 +274,8 @@ export const addDraft = mutation({
   handler: async (ctx, args) => {
     const deliverable = await ctx.db.get(args.deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
-    const latest = await ctx.db
-      .query("drafts")
-      .withIndex("by_deliverable", (q) =>
-        q.eq("deliverableId", args.deliverableId),
-      )
-      .order("desc")
-      .first();
-    const version = (latest?.version ?? 0) + 1;
+    const previous = await latestDraft(ctx, args.deliverableId);
+    const version = (previous?.version ?? 0) + 1;
     const draftId = await ctx.db.insert("drafts", {
       tenantId: deliverable.tenantId,
       deliverableId: args.deliverableId,
@@ -186,21 +285,35 @@ export const addDraft = mutation({
       model: args.model,
       playbookVersion: args.playbookVersion,
     });
-    assertTransition(deliverable.status, "verifying");
-    await ctx.db.patch(args.deliverableId, { status: "verifying" });
+    await transition(ctx, deliverable, "verifying");
     await appendEvent(ctx, {
       tenantId: deliverable.tenantId,
       accountId: deliverable.accountId,
       actorType: "generator",
       actorLabel: args.model,
       type: "draft.generated",
-      subjectRef: draftId,
-      payload: { version, deliverableId: args.deliverableId },
+      subjectRef: args.deliverableId,
+      payload: { draftId, draftVersion: version, model: args.model },
     });
     return draftId;
   },
 });
 
+/** Verify the latest draft of a deliverable with the deterministic rubric. */
+export const verifyDeliverable = mutation({
+  args: { deliverableId: v.id("deliverables") },
+  handler: async (ctx, args) => {
+    const deliverable = await ctx.db.get(args.deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+    const draft = await latestDraft(ctx, args.deliverableId);
+    if (!draft) throw new Error("No draft to verify");
+    const playbook = await latestPlaybook(ctx, deliverable.accountId);
+    if (!playbook) throw new Error("No playbook for this client account");
+    return await runVerification(ctx, deliverable, draft, playbook);
+  },
+});
+
+// Retained for API compatibility: record an externally produced verification.
 export const recordVerification = mutation({
   args: {
     draftId: v.id("drafts"),
@@ -213,7 +326,6 @@ export const recordVerification = mutation({
     if (!draft) throw new Error("Draft not found");
     const deliverable = await ctx.db.get(draft.deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
-
     const verificationId = await ctx.db.insert("verifications", {
       tenantId: draft.tenantId,
       draftId: args.draftId,
@@ -221,17 +333,20 @@ export const recordVerification = mutation({
       reasons: args.reasons,
       rubricVersion: args.rubricVersion,
     });
-    assertTransition(deliverable.status, "awaiting_proof");
-    await ctx.db.patch(draft.deliverableId, { status: "awaiting_proof" });
     await appendEvent(ctx, {
       tenantId: draft.tenantId,
       accountId: deliverable.accountId,
       actorType: "verifier",
       actorLabel: `rubric ${args.rubricVersion}`,
       type: args.result === "pass" ? "verification.passed" : "verification.failed",
-      subjectRef: verificationId,
-      payload: { draftId: args.draftId, reasons: args.reasons },
+      subjectRef: deliverable._id,
+      payload: { verificationId, draftId: args.draftId, reasons: args.reasons },
     });
+    await transition(
+      ctx,
+      deliverable,
+      args.result === "pass" ? "awaiting_proof" : "escalated",
+    );
     return verificationId;
   },
 });
@@ -246,7 +361,7 @@ export const recordProofDecision = mutation({
     userId: v.string(),
     actorLabel: v.string(),
     action: approvalAction,
-    editDiff: v.optional(v.string()),
+    editContent: v.optional(v.string()),
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -258,32 +373,60 @@ export const recordProofDecision = mutation({
       );
     }
 
-    await ctx.db.insert("approvals", {
+    const editDiff =
+      args.action === "edit"
+        ? (args.note ?? "Reviewer replaced the draft content at the proof gate.")
+        : args.action === "reject"
+          ? (args.note ?? "Reviewer rejected this version at the proof gate.")
+          : null;
+
+    const approvalId = await ctx.db.insert("approvals", {
       tenantId: deliverable.tenantId,
       deliverableId: args.deliverableId,
       userId: args.userId,
       action: args.action,
-      editDiff: args.editDiff ?? null,
+      editDiff,
     });
-
-    const nextStatus =
-      args.action === "approve"
-        ? "approved"
-        : args.action === "reject"
-          ? "rejected"
-          : "drafting"; // edit → changes requested → back to drafting
-    assertTransition(deliverable.status, nextStatus);
-    await ctx.db.patch(args.deliverableId, { status: nextStatus });
-
     await appendEvent(ctx, {
       tenantId: deliverable.tenantId,
       accountId: deliverable.accountId,
       actorType: "human",
       actorLabel: args.actorLabel,
-      type: `human.${args.action === "approve" ? "approved" : args.action === "reject" ? "rejected" : "edited"}`,
+      type: `approval.${args.action === "approve" ? "approved" : args.action === "reject" ? "rejected" : "edited"}`,
       subjectRef: args.deliverableId,
-      payload: { note: args.note ?? null, userId: args.userId },
+      payload: { approvalId, userId: args.userId, editDiff, note: args.note ?? null },
     });
+
+    if (args.action === "approve") {
+      await transition(ctx, deliverable, "approved");
+      return { status: "approved" as const };
+    }
+    if (args.action === "reject") {
+      await transition(ctx, deliverable, "rejected");
+      return { status: "rejected" as const };
+    }
+
+    // Edit: new immutable draft version, then re-verify with the real rubric.
+    const content = args.editContent?.trim();
+    if (!content) throw new Error("Edited content cannot be empty.");
+    const previous = await latestDraft(ctx, args.deliverableId);
+    if (!previous) throw new Error("No draft to edit");
+    const playbook = await latestPlaybook(ctx, deliverable.accountId);
+    if (!playbook) throw new Error("No playbook for this client account");
+
+    const draftId = await ctx.db.insert("drafts", {
+      tenantId: deliverable.tenantId,
+      deliverableId: args.deliverableId,
+      version: previous.version + 1,
+      title: previous.title,
+      content,
+      model: "human-edit",
+      playbookVersion: playbook.version,
+    });
+    await transition(ctx, deliverable, "verifying");
+    const draft = await ctx.db.get(draftId);
+    const result = await runVerification(ctx, deliverable, draft!, playbook);
+    return { status: deliverable.status, draftVersion: previous.version + 1, result };
   },
 });
 
@@ -294,17 +437,219 @@ export const scheduleDeliverable = mutation({
     if (!deliverable) throw new Error("Deliverable not found");
     // Invariant: no scheduling without a recorded human approval.
     await assertApprovalExists(ctx, args.deliverableId);
-    assertTransition(deliverable.status, "scheduled");
-    await ctx.db.patch(args.deliverableId, { status: "scheduled" });
-    await appendEvent(ctx, {
-      tenantId: deliverable.tenantId,
-      accountId: deliverable.accountId,
-      actorType: "human",
-      actorLabel: args.actorLabel,
-      type: "deliverable.scheduled",
-      subjectRef: args.deliverableId,
-      payload: {},
-    });
+    await transition(ctx, deliverable, "scheduled", args.actorLabel);
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Demo seed / reset (validation-node prototype)
+// ---------------------------------------------------------------------------
+
+export const seedDemo = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const tenants = await ctx.db.query("tenants").collect();
+    let tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
+    if (!tenant) {
+      const tenantId = await ctx.db.insert("tenants", { name: MOCK_TENANT.name });
+      tenant = (await ctx.db.get(tenantId))!;
+    }
+
+    const accounts = await ctx.db
+      .query("clientAccounts")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", tenant._id))
+      .collect();
+    let created = 0;
+
+    for (const name of MOCK_CLIENT_NAMES) {
+      const mock = createMockClientAccount(name);
+      let account = accounts.find((a) => a.name === name);
+      if (!account) {
+        const accountId = await ctx.db.insert("clientAccounts", {
+          tenantId: tenant._id,
+          name: mock.name,
+          website: mock.website,
+          industry: mock.industry,
+          targetAudience: mock.targetAudience,
+          primaryOffer: mock.primaryOffer,
+          status: "active",
+        });
+        account = (await ctx.db.get(accountId))!;
+        await appendEvent(ctx, {
+          tenantId: tenant._id,
+          accountId: account._id,
+          actorType: "system",
+          actorLabel: "Galley demo seed",
+          type: "client_account.created",
+          subjectRef: account._id,
+          payload: { name: mock.name, website: mock.website },
+        });
+      }
+
+      let playbook = await latestPlaybook(ctx, account._id);
+      if (!playbook) {
+        const definition = createMockPlaybook(mock);
+        const playbookId = await ctx.db.insert("playbooks", {
+          tenantId: tenant._id,
+          accountId: account._id,
+          version: 1,
+          voice: definition.voice,
+          approvedClaims: definition.approvedClaims,
+          forbiddenClaims: definition.forbiddenClaims,
+          channels: definition.channels,
+          reportingKpi: definition.reportingKpi,
+        });
+        playbook = (await ctx.db.get(playbookId))!;
+        await appendEvent(ctx, {
+          tenantId: tenant._id,
+          accountId: account._id,
+          actorType: "system",
+          actorLabel: "Galley demo seed",
+          type: "playbook.created",
+          subjectRef: account._id,
+          payload: { playbookId: playbook._id, version: 1 },
+        });
+      }
+
+      const existing = await ctx.db
+        .query("deliverables")
+        .withIndex("by_account", (q) => q.eq("accountId", account._id))
+        .collect();
+      const target = 2;
+      if (existing.length >= target) continue;
+
+      const template = generateMockDeliverables([mock], [createMockPlaybook(mock)]);
+      const templateDeliverable = template.deliverables[0];
+      const templateDraft = template.drafts[0];
+
+      for (let index = existing.length; index < target; index += 1) {
+        const title =
+          index === 0
+            ? templateDeliverable.title
+            : `${templateDeliverable.title} — Channel cutdown`;
+        const content =
+          index === 0
+            ? templateDraft.content
+            : `${templateDraft.content}\n\nChannel cutdown: ${mock.primaryOffer}.`;
+
+        const deliverableId = await ctx.db.insert("deliverables", {
+          tenantId: tenant._id,
+          accountId: account._id,
+          period: templateDeliverable.period,
+          type: templateDeliverable.type,
+          channel: templateDeliverable.channel,
+          title,
+          status: "drafting",
+        });
+        const deliverable = (await ctx.db.get(deliverableId))!;
+        await appendEvent(ctx, {
+          tenantId: tenant._id,
+          accountId: account._id,
+          actorType: "system",
+          actorLabel: "Galley demo seed",
+          type: "deliverable.created",
+          subjectRef: deliverableId,
+          payload: { period: deliverable.period, type: deliverable.type, channel: deliverable.channel },
+        });
+        await appendEvent(ctx, {
+          tenantId: tenant._id,
+          accountId: account._id,
+          actorType: "system",
+          actorLabel: "Galley",
+          type: "playbook.selected",
+          subjectRef: deliverableId,
+          payload: { playbookId: playbook._id, playbookVersion: playbook.version },
+        });
+
+        const draftId = await ctx.db.insert("drafts", {
+          tenantId: tenant._id,
+          deliverableId,
+          version: 1,
+          title,
+          content,
+          model: "mock-galley-generator-v1",
+          playbookVersion: playbook.version,
+        });
+        await appendEvent(ctx, {
+          tenantId: tenant._id,
+          accountId: account._id,
+          actorType: "generator",
+          actorLabel: "Mock generator",
+          type: "draft.generated",
+          subjectRef: deliverableId,
+          payload: { draftId, draftVersion: 1, model: "mock-galley-generator-v1" },
+        });
+        await transition(ctx, deliverable, "verifying");
+        const draft = (await ctx.db.get(draftId))!;
+        await runVerification(ctx, deliverable, draft, playbook);
+        created += 1;
+      }
+
+      await appendEvent(ctx, {
+        tenantId: tenant._id,
+        accountId: account._id,
+        actorType: "system",
+        actorLabel: "Galley demo seed",
+        type: "demo.seeded",
+        subjectRef: account._id,
+        payload: { period: "2026-06", createdDeliverables: created },
+      });
+    }
+
+    return { created };
+  },
+});
+
+export const resetDemo = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Removes generated demo work. Events are never deleted — the append-only
+    // history is the product.
+    const tenants = await ctx.db.query("tenants").collect();
+    const tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
+    if (!tenant) return { removed: 0 };
+    let removed = 0;
+    const accounts = await ctx.db
+      .query("clientAccounts")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", tenant._id))
+      .collect();
+    for (const account of accounts) {
+      const deliverables = await ctx.db
+        .query("deliverables")
+        .withIndex("by_account", (q) => q.eq("accountId", account._id))
+        .collect();
+      for (const deliverable of deliverables) {
+        const drafts = await ctx.db
+          .query("drafts")
+          .withIndex("by_deliverable", (q) => q.eq("deliverableId", deliverable._id))
+          .collect();
+        for (const draft of drafts) {
+          const verifications = await ctx.db
+            .query("verifications")
+            .withIndex("by_draft", (q) => q.eq("draftId", draft._id))
+            .collect();
+          for (const verification of verifications) await ctx.db.delete(verification._id);
+          await ctx.db.delete(draft._id);
+        }
+        const approvals = await ctx.db
+          .query("approvals")
+          .withIndex("by_deliverable", (q) => q.eq("deliverableId", deliverable._id))
+          .collect();
+        for (const approval of approvals) await ctx.db.delete(approval._id);
+        await ctx.db.delete(deliverable._id);
+        removed += 1;
+      }
+      await appendEvent(ctx, {
+        tenantId: tenant._id,
+        accountId: account._id,
+        actorType: "human",
+        actorLabel: "Demo reset",
+        type: "demo.reset",
+        subjectRef: account._id,
+        payload: { removedDeliverables: removed },
+      });
+    }
+    return { removed };
   },
 });
 
@@ -312,26 +657,33 @@ export const scheduleDeliverable = mutation({
 // Queries
 // ---------------------------------------------------------------------------
 
-export const listDeliverables = query({
-  args: {
-    tenantId: v.id("tenants"),
-    status: v.optional(deliverableStatus),
+export const getQueue = query({
+  args: {},
+  handler: async (ctx) => {
+    const deliverables = await ctx.db.query("deliverables").order("desc").collect();
+    return await Promise.all(
+      deliverables.map(async (deliverable) => {
+        const account = await ctx.db.get(deliverable.accountId);
+        const playbook = await latestPlaybook(ctx, deliverable.accountId);
+        const draft = await latestDraft(ctx, deliverable._id);
+        const verification = draft ? await latestVerification(ctx, draft._id) : null;
+        const events = await ctx.db
+          .query("events")
+          .withIndex("by_subject", (q) => q.eq("subjectRef", deliverable._id))
+          .collect();
+        return { deliverable, account, playbook, draft, verification, eventCount: events.length };
+      }),
+    );
   },
-  handler: async (ctx, args): Promise<Doc<"deliverables">[]> => {
-    if (args.status !== undefined) {
-      const status = args.status;
-      return await ctx.db
-        .query("deliverables")
-        .withIndex("by_tenant_status", (q) =>
-          q.eq("tenantId", args.tenantId).eq("status", status),
-        )
-        .collect();
-    }
-    return await ctx.db
-      .query("deliverables")
-      .withIndex("by_tenant_status", (q) => q.eq("tenantId", args.tenantId))
-      .collect();
-  },
+});
+
+export const getEventsForDeliverable = query({
+  args: { deliverableId: v.id("deliverables") },
+  handler: async (ctx, args) =>
+    ctx.db
+      .query("events")
+      .withIndex("by_subject", (q) => q.eq("subjectRef", args.deliverableId))
+      .collect(),
 });
 
 export const getProofContext = query({
@@ -339,26 +691,18 @@ export const getProofContext = query({
   handler: async (ctx, args) => {
     const deliverable = await ctx.db.get(args.deliverableId);
     if (!deliverable) return null;
-    const drafts = await ctx.db
-      .query("drafts")
-      .withIndex("by_deliverable", (q) =>
-        q.eq("deliverableId", args.deliverableId),
-      )
-      .collect();
-    const latestDraft = drafts.at(-1) ?? null;
-    const verifications = latestDraft
+    const draft = await latestDraft(ctx, args.deliverableId);
+    const verifications = draft
       ? await ctx.db
           .query("verifications")
-          .withIndex("by_draft", (q) => q.eq("draftId", latestDraft._id))
+          .withIndex("by_draft", (q) => q.eq("draftId", draft._id))
           .collect()
       : [];
     const approvals = await ctx.db
       .query("approvals")
-      .withIndex("by_deliverable", (q) =>
-        q.eq("deliverableId", args.deliverableId),
-      )
+      .withIndex("by_deliverable", (q) => q.eq("deliverableId", args.deliverableId))
       .collect();
-    return { deliverable, latestDraft, verifications, approvals };
+    return { deliverable, latestDraft: draft, verifications, approvals };
   },
 });
 
@@ -368,19 +712,5 @@ export const getRecord = query({
     ctx.db
       .query("events")
       .withIndex("by_subject", (q) => q.eq("subjectRef", args.subjectRef))
-      .collect(),
-});
-
-export const listAccountEvents = query({
-  args: {
-    tenantId: v.id("tenants"),
-    accountId: v.id("clientAccounts"),
-  },
-  handler: async (ctx, args) =>
-    ctx.db
-      .query("events")
-      .withIndex("by_account", (q) =>
-        q.eq("tenantId", args.tenantId).eq("accountId", args.accountId),
-      )
       .collect(),
 });

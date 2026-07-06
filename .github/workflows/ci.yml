@@ -28,6 +28,9 @@ jobs:
       - name: Domain invariants (mock validation node)
         run: npm run validate:galley
 
+      - name: Verifier rules contract
+        run: npm run validate:galley:verifier
+
       - name: Persistence invariants
         run: npm run validate:galley:persistence
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CircleAlert, FileText, Fingerprint, ShieldCheck, UserCheck } from "lucide-react";
-import { getDeliverableWithCurrentDraft, isSupabaseConfigured, listDeliverables, listEventsForDeliverable } from "@/lib/galley/repository";
+import { getQueueDetails, isBackendConfigured, listEventsForDeliverable } from "@/lib/galley/convexData";
 import type { Event } from "@/lib/galley/types";
 
 export const dynamic = "force-dynamic";
@@ -20,18 +20,19 @@ function summary(event: Event) {
 function Icon({ event }: { event: Event }) { if (event.type.includes("failed") || event.type.includes("rejected")) return <CircleAlert size={12}/>; if (event.actorType === "human") return <UserCheck size={12}/>; return <FileText size={12}/>; }
 
 export default async function RecordsPage({ searchParams }: { searchParams: Promise<{ deliverable?: string }> }) {
-  const configured = isSupabaseConfigured();
-  let error = ""; let deliverables = [] as Awaited<ReturnType<typeof listDeliverables>>;
-  if (configured) try { deliverables = await listDeliverables(); } catch (cause) { error = cause instanceof Error ? cause.message : "Unable to load records."; }
+  const configured = isBackendConfigured();
+  let error = ""; let queue = [] as Awaited<ReturnType<typeof getQueueDetails>>;
+  if (configured) try { queue = await getQueueDetails(); } catch (cause) { error = cause instanceof Error ? cause.message : "Unable to load records."; }
+  const deliverables = queue.map((row) => row.deliverable);
   const requested = (await searchParams).deliverable;
   const selected = deliverables.find((item) => item.id === requested) ?? deliverables[0];
-  const detail = selected ? await getDeliverableWithCurrentDraft(selected.id) : null;
+  const detail = selected ? queue.find((row) => row.deliverable.id === selected.id) ?? null : null;
   const events = selected ? await listEventsForDeliverable(selected.id) : [];
   const decision = [...events].reverse().find((event) => event.type.startsWith("approval."));
 
   return <div className="mx-auto max-w-6xl">
     <header className="border-b border-border pb-8"><p className="eyebrow">Append-only evidence</p><h1 className="editorial-display mt-4 text-5xl md:text-6xl">Records</h1><p className="mt-4 max-w-2xl leading-7 text-muted">The event log is the source of truth: who acted, what changed, and which version moved through the gate.</p></header>
-    {(!configured || error) && <section className="mt-7 border border-warning/30 bg-warning/5 p-6"><h2 className="font-semibold">Persistence setup required</h2><p className="mt-2 text-sm text-muted">{error || "Configure Supabase, apply the migrations, and sign in to inspect chain-of-custody records."}</p></section>}
+    {(!configured || error) && <section className="mt-7 border border-warning/30 bg-warning/5 p-6"><h2 className="font-semibold">Persistence setup required</h2><p className="mt-2 text-sm text-muted">{error || "Connect the Convex backend to inspect chain-of-custody records."}</p></section>}
     {configured && !error && !selected && <section className="mt-7 border border-border bg-surface p-12 text-center"><Fingerprint className="mx-auto text-primary"/><h2 className="mt-4 font-semibold">No deliverable records yet.</h2><p className="mt-2 text-sm text-muted">Seed work from the Proof Queue to create an append-only trail.</p></section>}
     {selected && detail && <>
       <nav className="mt-7 flex gap-2 overflow-x-auto pb-1" aria-label="Deliverable records">{deliverables.map((item) => <Link key={item.id} href={`/dashboard/records?deliverable=${item.id}`} className={`min-w-48 shrink-0 border p-3 ${item.id === selected.id ? "border-primary bg-primary/5" : "border-border bg-surface/40"}`}><span className="block text-xs font-medium">{item.title}</span><span className="mt-1 block text-[11px] text-slate">{item.channel} · {item.status.replaceAll("_", " ")}</span></Link>)}</nav>

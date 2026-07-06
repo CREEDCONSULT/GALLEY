@@ -103,10 +103,10 @@ check("verification recorded", proof.verifications.length === 1);
 const record = await client.query(api.galley.getRecord, { subjectRef: deliverableId });
 const types = record.map((e) => e.type);
 check(
-  "record captured creation, decision, and scheduling events",
+  "record captured creation, decision, and state-change events",
   types.includes("deliverable.created") &&
-    types.includes("human.approved") &&
-    types.includes("deliverable.scheduled"),
+    types.includes("approval.approved") &&
+    types.includes("deliverable.status_changed"),
 );
 
 if (failures.length) {

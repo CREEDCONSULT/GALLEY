@@ -1,0 +1,170 @@
+import "server-only";
+
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import type {
+  ApprovalAction,
+  ClientAccount,
+  Deliverable,
+  Draft,
+  Event,
+  EventActorType,
+  GalleyEventType,
+  Playbook,
+  Verification,
+} from "./types";
+
+// Server-side facade over the Convex backend (feat/convex trial).
+// Maps Convex documents (_id/_creationTime) onto the canonical lib/galley
+// types the UI already consumes.
+
+export function isBackendConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_CONVEX_URL);
+}
+
+function client(): ConvexHttpClient {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!url) throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured.");
+  return new ConvexHttpClient(url);
+}
+
+const toIso = (ms: number) => new Date(ms).toISOString();
+
+export interface QueueRow {
+  deliverable: Deliverable;
+  account: ClientAccount;
+  playbook: Playbook | null;
+  draft: Draft | null;
+  verification: Verification | null;
+  eventCount: number;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function mapDeliverable(doc: any): Deliverable {
+  return {
+    id: doc._id,
+    tenantId: doc.tenantId,
+    accountId: doc.accountId,
+    period: doc.period,
+    type: doc.type,
+    channel: doc.channel,
+    title: doc.title,
+    status: doc.status,
+    createdAt: toIso(doc._creationTime),
+    updatedAt: toIso(doc._creationTime),
+  };
+}
+
+function mapAccount(doc: any): ClientAccount {
+  return {
+    id: doc._id,
+    tenantId: doc.tenantId,
+    name: doc.name,
+    website: doc.website,
+    industry: doc.industry,
+    targetAudience: doc.targetAudience,
+    primaryOffer: doc.primaryOffer,
+    status: doc.status,
+    createdAt: toIso(doc._creationTime),
+  };
+}
+
+function mapPlaybook(doc: any): Playbook {
+  return {
+    id: doc._id,
+    tenantId: doc.tenantId,
+    accountId: doc.accountId,
+    version: doc.version,
+    voice: doc.voice,
+    approvedClaims: doc.approvedClaims,
+    forbiddenClaims: doc.forbiddenClaims,
+    channels: doc.channels,
+    reportingKpi: doc.reportingKpi,
+    createdAt: toIso(doc._creationTime),
+  };
+}
+
+function mapDraft(doc: any): Draft {
+  return {
+    id: doc._id,
+    tenantId: doc.tenantId,
+    deliverableId: doc.deliverableId,
+    version: doc.version,
+    title: doc.title,
+    content: doc.content,
+    model: doc.model,
+    playbookVersion: doc.playbookVersion,
+    createdAt: toIso(doc._creationTime),
+  };
+}
+
+function mapVerification(doc: any): Verification {
+  return {
+    id: doc._id,
+    tenantId: doc.tenantId,
+    draftId: doc.draftId,
+    result: doc.result,
+    reasons: doc.reasons,
+    rubricVersion: doc.rubricVersion,
+    createdAt: toIso(doc._creationTime),
+  };
+}
+
+function mapEvent(doc: any): Event {
+  return {
+    id: doc._id,
+    tenantId: doc.tenantId,
+    accountId: doc.accountId,
+    actorType: doc.actorType as EventActorType,
+    actorLabel: doc.actorLabel,
+    type: doc.type as GalleyEventType,
+    subjectRef: doc.subjectRef,
+    payload: doc.payload ?? {},
+    createdAt: toIso(doc._creationTime),
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+export async function getQueueDetails(): Promise<QueueRow[]> {
+  const rows = await client().query(api.galley.getQueue, {});
+  return rows
+    .filter((row) => row.account)
+    .map((row) => ({
+      deliverable: mapDeliverable(row.deliverable),
+      account: mapAccount(row.account),
+      playbook: row.playbook ? mapPlaybook(row.playbook) : null,
+      draft: row.draft ? mapDraft(row.draft) : null,
+      verification: row.verification ? mapVerification(row.verification) : null,
+      eventCount: row.eventCount as number,
+    }));
+}
+
+export async function listEventsForDeliverable(deliverableId: string): Promise<Event[]> {
+  const rows = await client().query(api.galley.getEventsForDeliverable, {
+    deliverableId: deliverableId as Id<"deliverables">,
+  });
+  return rows.map(mapEvent);
+}
+
+export async function seedDemo(): Promise<{ created: number }> {
+  return await client().mutation(api.galley.seedDemo, {});
+}
+
+export async function resetDemo(): Promise<{ removed: number }> {
+  return await client().mutation(api.galley.resetDemo, {});
+}
+
+export async function recordProofDecision(input: {
+  deliverableId: string;
+  userId: string;
+  actorLabel: string;
+  action: ApprovalAction;
+  editContent?: string;
+  note?: string;
+}): Promise<{ status: string; draftVersion?: number; result?: "pass" | "fail" }> {
+  return await client().mutation(api.galley.recordProofDecision, {
+    ...input,
+    deliverableId: input.deliverableId as Id<"deliverables">,
+  });
+}
