@@ -739,7 +739,17 @@ export const resetDemo = mutation({
 export const getQueue = query({
   args: {},
   handler: async (ctx) => {
-    const deliverables = await ctx.db.query("deliverables").order("desc").collect();
+    // Interim tenant scoping: until authentication and workspace membership
+    // land, the app operates inside the demo workspace tenant. Never widen
+    // this back to a cross-tenant scan (invariant: tenant isolation).
+    const tenants = await ctx.db.query("tenants").collect();
+    const tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
+    if (!tenant) return [];
+    const deliverables = await ctx.db
+      .query("deliverables")
+      .withIndex("by_tenant_status", (q) => q.eq("tenantId", tenant._id))
+      .order("desc")
+      .collect();
     return await Promise.all(
       deliverables.map(async (deliverable) => {
         const account = await ctx.db.get(deliverable.accountId);
