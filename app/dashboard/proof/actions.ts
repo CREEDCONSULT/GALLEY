@@ -7,6 +7,7 @@ import {
   resetDemo,
   seedDemo,
 } from "@/lib/galley/convexData";
+import { RUBRIC_VERSION } from "@/lib/galley/verifier";
 
 export type GalleyActionResult = {
   ok: boolean;
@@ -34,7 +35,7 @@ export async function seedValidationNodeDemo(): Promise<GalleyActionResult> {
       ok: true,
       message:
         created > 0
-          ? `Demo seeded with ${created} new deliverables, verified by ${"galley-rules-v0.2"}.`
+          ? `Demo seeded with ${created} new deliverables, verified by ${RUBRIC_VERSION}.`
           : "Demo data is already seeded; no duplicates were created.",
     };
   } catch (error) {

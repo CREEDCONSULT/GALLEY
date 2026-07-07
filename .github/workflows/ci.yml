@@ -31,6 +31,12 @@ jobs:
       - name: Verifier rules contract
         run: npm run validate:galley:verifier
 
+      - name: Verifier eval (precision/recall gate)
+        run: npm run eval:galley:verifier
+
+      - name: LLM-verifier helper contract
+        run: npm run validate:galley:llm
+
       - name: Production build
         run: npm run build
         env:

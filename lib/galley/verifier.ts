@@ -4,7 +4,7 @@
 // mutations, and validation scripts. Every finding cites the playbook
 // constraint it maps to — evidence, not confidence theater.
 
-export const RUBRIC_VERSION = "galley-rules-v0.2";
+export const RUBRIC_VERSION = "galley-rules-v0.3";
 
 export type VerifierSeverity = "block" | "warn" | "note";
 
@@ -45,10 +45,25 @@ const RISK_LEXICON = [
   "clinically proven",
   "100% effective",
   "#1",
+  "number one",
   "cure",
   "cures",
   "instant results",
+  "no side effects",
+  "best in class",
+  "fda approved",
 ];
+
+// Hard platform character limits for channels that enforce them. A draft that
+// exceeds a hard limit literally cannot post → block. Channels not listed have
+// no enforced limit. Keys are normalized channel names.
+const CHANNEL_LIMITS: Record<string, number> = {
+  x: 280,
+  twitter: 280,
+  "x twitter": 280,
+  sms: 160,
+  "google business post": 1500,
+};
 
 function normalize(text: string): string {
   return text
@@ -127,7 +142,18 @@ export function verifyDraft(
     });
   }
 
-  // Rule 4 — substantiation-risk language (warn only; humans decide).
+  // Rule 4 — hard channel character limits (block: the post cannot ship).
+  const channelLimit = CHANNEL_LIMITS[normalize(draft.channel)];
+  if (channelLimit !== undefined && content.length > channelLimit) {
+    findings.push({
+      rule: "channel.length_limit",
+      severity: "block",
+      evidence: `Draft is ${content.length} characters; ${draft.channel} allows ${channelLimit}.`,
+      constraint: `${draft.channel} enforces a hard ${channelLimit}-character limit.`,
+    });
+  }
+
+  // Rule 5 — substantiation-risk language (warn only; humans decide).
   const forbiddenNormalized = playbook.forbiddenClaims.map(normalize);
   for (const term of RISK_LEXICON) {
     if (forbiddenNormalized.includes(normalize(term))) continue; // already blocked above
@@ -141,7 +167,7 @@ export function verifyDraft(
     }
   }
 
-  // Rule 5 — note which approved claims are present (supporting evidence).
+  // Rule 6 — note which approved claims are present (supporting evidence).
   const presentApproved = playbook.approvedClaims.filter((claim) =>
     findPhrase(content, claim),
   );
