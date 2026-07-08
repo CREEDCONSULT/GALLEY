@@ -14,6 +14,9 @@ The governed loop: **Produce → Verify → Proof → Schedule → Report.**
 - **Type check**: `npx tsc --noEmit`
 - **Domain invariant check (mock)**: `npm run validate:galley`
 - **Verifier rules contract**: `npm run validate:galley:verifier`
+- **Verifier eval (precision/recall gate)**: `npm run eval:galley:verifier` (golden set in
+  `lib/galley/eval/`; gates on PRD §7 thresholds; reports the paraphrase/voice gap for the LLM layer)
+- **LLM-verifier helper contract**: `npm run validate:galley:llm`
 - **Convex live smoke test**: `npm run smoke:galley:convex` (full loop + human-gate + auth invariants against the dev deployment)
 - **Convex deploy (dev)**: `npx convex dev --once` (uses `CONVEX_DEPLOY_KEY` from `.env.local`)
 

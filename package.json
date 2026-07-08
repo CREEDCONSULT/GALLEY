@@ -10,6 +10,8 @@
     "lint": "eslint",
     "validate:galley": "node --experimental-strip-types scripts/validate-galley-node.mjs",
     "validate:galley:verifier": "node --experimental-strip-types scripts/validate-galley-verifier.mjs",
+    "eval:galley:verifier": "node --experimental-strip-types scripts/eval-galley-verifier.mjs",
+    "validate:galley:llm": "node --experimental-strip-types scripts/validate-galley-llm.mjs",
     "smoke:galley:convex": "node scripts/smoke-galley-convex.mjs"
   },
   "dependencies": {

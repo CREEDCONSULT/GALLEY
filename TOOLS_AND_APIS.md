@@ -17,7 +17,7 @@ invariant** (publish gate, append-only record, claims rules) — those live in o
 
 | Service | Purpose | Est. cost | Notes |
 |---|---|---|---|
-| **Anthropic Claude API** | LLM-graded checks (voice adherence, claim-paraphrase detection); later drafting | Usage-based; Haiku for cheap checks, Sonnet for judgment calls | Rubric + model version stamped on every verification run |
+| **Anthropic Claude API** | LLM-graded checks (voice adherence, claim-paraphrase detection); later drafting | Usage-based; Haiku for cheap checks, Sonnet for judgment calls | **Scaffolded** in `convex/verifierLlm.ts` (Haiku, rubric `galley-llm-v0.1`). Activate with `npx convex env set ANTHROPIC_API_KEY sk-...`; degrades to `active:false` without a key |
 | **Voyage AI or OpenAI embeddings** | Paraphrase similarity vs. forbidden claims (pgvector) | ~$0.02–0.13 / M tokens | Decide via Phase 2 eval harness vs. LLM-judge |
 | **Sentry** | Error monitoring | Team ~$26/mo | Client + server + edge |
 | **Resend** | Transactional email (proof notifications, invites) | Free → $20/mo | React Email templates |
