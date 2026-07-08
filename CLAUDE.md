@@ -69,8 +69,9 @@ Run typecheck + build + `validate:galley` before claiming work complete.
 2. **The event log is append-only.** Corrections are new events. On Convex there is no trigger —
    mutations are the only write path and none may patch/delete an `events` row. Never weaken this.
 3. **Drafts and verifications are immutable versions.** New content = new version row.
-4. **Tenant isolation.** Every domain row carries `tenant_id`; all access is authorized by
-   workspace + client account. RLS stays enabled.
+4. **Tenant isolation.** Each signup gets its own workspace (tenant); every domain row carries
+   `tenantId`. All reads resolve the caller's workspace via `getWorkspaceId`; all writes go through
+   `requireWorkspace` and reject cross-tenant ids. Never scope a query to a shared/hardcoded tenant.
 5. **Claims are explicit rules.** Approved/forbidden claims live in the playbook; never infer
    approval from generated text.
 6. **No confidence theater.** Status language describes observable state; verifier notes state

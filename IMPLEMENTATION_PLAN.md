@@ -25,10 +25,11 @@ The prototype is now a persisted, authenticated, deployed app.
 **Workstreams**
 1. [x] **Backend on Convex** — schema + mutations in `convex/`; playbooks versioned; proof
    decisions, drafts, verifications, and events fully persisted; demo seed/reset. Supabase removed.
-2. [x] **Auth** — Convex Auth (Password); `memberships` table (owner/manager/reviewer); routes
-   protected by middleware; proof decisions require an authenticated actor and attribute to the
-   real user. *(Remaining: enforce per-user tenant scoping on the create paths — onboarding and
-   intake — not just proof decisions.)*
+2. [x] **Auth + tenant isolation** — Convex Auth (Password); `memberships` table. Each signup gets
+   its own workspace; all reads scope via `getWorkspaceId`, all writes via `requireWorkspace` and
+   reject cross-tenant ids; demo seed populates the caller's own workspace. Proven by the smoke
+   test's three isolation checks + a live two-user UI test. *(Remaining: team invites — workspaces
+   are single-owner today.)*
 3. [x] **Deploy** — Railway `galley-web` live from `main`; verified in production (sign up →
    protected proof queue → attributed approval in the record).
 4. [ ] **Test harness** — Vitest + Playwright + an automated append-only / approval-gate / tenant

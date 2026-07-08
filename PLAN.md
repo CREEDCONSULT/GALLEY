@@ -44,8 +44,8 @@ close 5/5 of the deterministic gap. An 18-case golden **eval harness** gates CI 
 **Convex Auth** (email+password): routes protected, proof decisions require an authenticated actor
 and attribute to the real user in the record (verified live in production).
 
-**Not built:** generation, billing, publishing, reporting; full per-function tenant isolation on
-create paths; a production (non-dev) Convex deployment.
+**Not built:** generation, billing, publishing, reporting; team invites (workspaces are
+single-owner today); a production (non-dev) Convex deployment.
 
 **Resolved decisions:** backend = Convex (Supabase removed), auth = Convex Auth, hosting = Railway.
 
