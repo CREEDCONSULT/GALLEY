@@ -14,7 +14,6 @@ import { approvalAction } from "./schema";
 import { verifyDraft } from "../lib/galley/verifier";
 import {
   MOCK_CLIENT_NAMES,
-  MOCK_TENANT,
   createMockClientAccount,
   createMockPlaybook,
   generateMockDeliverables,
@@ -126,36 +125,53 @@ async function verificationLayers(
  * call for a user, the membership is created (owner) — this is the interim
  * onboarding-to-workspace link until multi-workspace management ships.
  */
-async function requireReviewer(
+function reviewerLabel(user: Doc<"users"> | null): string {
+  return (
+    (user?.name as string | undefined) ??
+    (user?.email as string | undefined) ??
+    "Reviewer"
+  );
+}
+
+/**
+ * Resolve the signed-in user's own workspace, creating it on first use. Tenant
+ * isolation: every signup gets its own workspace (an agency = a workspace);
+ * data is scoped by membership, never shared across users. Reversible to a
+ * shared/invite model later. Throws if unauthenticated.
+ */
+async function requireWorkspace(
   ctx: MutationCtx,
 ): Promise<{ userId: Id<"users">; label: string; tenantId: Id<"tenants"> }> {
   const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("You must be signed in to make a proof decision.");
+  if (!userId) throw new Error("You must be signed in.");
   const user = await ctx.db.get(userId);
-  const label =
-    (user?.name as string | undefined) ??
-    (user?.email as string | undefined) ??
-    "Reviewer";
+  const label = reviewerLabel(user);
 
-  const tenant = await ensureDemoTenant(ctx);
   const existing = await ctx.db
     .query("memberships")
     .withIndex("by_user", (q) => q.eq("userId", userId))
-    .filter((q) => q.eq(q.field("tenantId"), tenant._id))
     .first();
-  if (!existing) {
-    await ctx.db.insert("memberships", { userId, tenantId: tenant._id, role: "owner" });
-  }
-  return { userId, label, tenantId: tenant._id };
+  if (existing) return { userId, label, tenantId: existing.tenantId };
+
+  const tenantId = await ctx.db.insert("tenants", { name: `${label}'s workspace` });
+  await ctx.db.insert("memberships", { userId, tenantId, role: "owner" });
+  return { userId, label, tenantId };
 }
 
-async function ensureDemoTenant(ctx: MutationCtx): Promise<Doc<"tenants">> {
-  const tenants = await ctx.db.query("tenants").collect();
-  const found = tenants.find((t) => t.name === MOCK_TENANT.name);
-  if (found) return found;
-  const tenantId = await ctx.db.insert("tenants", { name: MOCK_TENANT.name });
-  return (await ctx.db.get(tenantId))!;
+/** Read-side workspace resolution. Returns null for signed-out users or users
+ * who have not created a workspace yet (no data to show). */
+async function getWorkspaceId(ctx: QueryCtx): Promise<Id<"tenants"> | null> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
+  const membership = await ctx.db
+    .query("memberships")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+  return membership?.tenantId ?? null;
 }
+
+// Back-compat name: proof decisions still call requireReviewer.
+const requireReviewer = requireWorkspace;
 
 async function assertApprovalExists(
   ctx: MutationCtx,
@@ -426,6 +442,8 @@ export const recordProofDecision = mutation({
     const reviewer = await requireReviewer(ctx);
     const deliverable = await ctx.db.get(args.deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
+    // Isolation: you can only act on deliverables in your own workspace.
+    if (deliverable.tenantId !== reviewer.tenantId) throw new Error("Deliverable not found");
     if (deliverable.status !== "awaiting_proof") {
       throw new Error(
         `Proof decisions are only valid while awaiting proof (current: ${deliverable.status}).`,
@@ -490,13 +508,15 @@ export const recordProofDecision = mutation({
 });
 
 export const scheduleDeliverable = mutation({
-  args: { deliverableId: v.id("deliverables"), actorLabel: v.string() },
+  args: { deliverableId: v.id("deliverables") },
   handler: async (ctx, args) => {
+    const reviewer = await requireWorkspace(ctx);
     const deliverable = await ctx.db.get(args.deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
+    if (deliverable.tenantId !== reviewer.tenantId) throw new Error("Deliverable not found");
     // Invariant: no scheduling without a recorded human approval.
     await assertApprovalExists(ctx, args.deliverableId);
-    await transition(ctx, deliverable, "scheduled", args.actorLabel);
+    await transition(ctx, deliverable, "scheduled", reviewer.label);
   },
 });
 
@@ -516,8 +536,11 @@ export const intakeDraft = mutation({
     source: v.string(),
   },
   handler: async (ctx, args) => {
+    const { tenantId } = await requireWorkspace(ctx);
     const account = await ctx.db.get(args.accountId);
     if (!account) throw new Error("Client account not found");
+    // Isolation: you can only submit drafts to accounts in your own workspace.
+    if (account.tenantId !== tenantId) throw new Error("Client account not found");
     const playbook = await latestPlaybook(ctx, args.accountId);
     if (!playbook) throw new Error("Create a playbook for this client before submitting drafts.");
 
@@ -579,12 +602,11 @@ export const intakeDraft = mutation({
 export const listAccounts = query({
   args: {},
   handler: async (ctx) => {
-    const tenants = await ctx.db.query("tenants").collect();
-    const tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
-    if (!tenant) return [];
+    const tenantId = await getWorkspaceId(ctx);
+    if (!tenantId) return [];
     const accounts = await ctx.db
       .query("clientAccounts")
-      .withIndex("by_tenant", (q) => q.eq("tenantId", tenant._id))
+      .withIndex("by_tenant", (q) => q.eq("tenantId", tenantId))
       .collect();
     return await Promise.all(
       accounts.map(async (account) => ({
@@ -613,23 +635,18 @@ export const createClientWithPlaybook = mutation({
     reportingKpi: v.string(),
   },
   handler: async (ctx, args) => {
-    const tenants = await ctx.db.query("tenants").collect();
-    let tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
-    if (!tenant) {
-      const tenantId = await ctx.db.insert("tenants", { name: MOCK_TENANT.name });
-      tenant = (await ctx.db.get(tenantId))!;
-    }
+    const { tenantId, label } = await requireWorkspace(ctx);
 
     const accounts = await ctx.db
       .query("clientAccounts")
-      .withIndex("by_tenant", (q) => q.eq("tenantId", tenant._id))
+      .withIndex("by_tenant", (q) => q.eq("tenantId", tenantId))
       .collect();
     let account = accounts.find(
       (a) => a.name.toLowerCase() === args.name.toLowerCase(),
     );
     if (!account) {
       const accountId = await ctx.db.insert("clientAccounts", {
-        tenantId: tenant._id,
+        tenantId,
         name: args.name,
         website: args.website,
         industry: args.industry,
@@ -639,10 +656,10 @@ export const createClientWithPlaybook = mutation({
       });
       account = (await ctx.db.get(accountId))!;
       await appendEvent(ctx, {
-        tenantId: tenant._id,
+        tenantId,
         accountId: account._id,
         actorType: "human",
-        actorLabel: "Workspace owner",
+        actorLabel: label,
         type: "client_account.created",
         subjectRef: account._id,
         payload: { name: args.name, website: args.website },
@@ -652,7 +669,7 @@ export const createClientWithPlaybook = mutation({
     const previous = await latestPlaybook(ctx, account._id);
     const version = (previous?.version ?? 0) + 1;
     const playbookId = await ctx.db.insert("playbooks", {
-      tenantId: tenant._id,
+      tenantId,
       accountId: account._id,
       version,
       voice: args.voice,
@@ -662,10 +679,10 @@ export const createClientWithPlaybook = mutation({
       reportingKpi: args.reportingKpi,
     });
     await appendEvent(ctx, {
-      tenantId: tenant._id,
+      tenantId,
       accountId: account._id,
       actorType: "human",
-      actorLabel: "Workspace owner",
+      actorLabel: label,
       type: "playbook.created",
       subjectRef: account._id,
       payload: { playbookId, version },
@@ -681,12 +698,9 @@ export const createClientWithPlaybook = mutation({
 export const seedDemo = mutation({
   args: {},
   handler: async (ctx) => {
-    const tenants = await ctx.db.query("tenants").collect();
-    let tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
-    if (!tenant) {
-      const tenantId = await ctx.db.insert("tenants", { name: MOCK_TENANT.name });
-      tenant = (await ctx.db.get(tenantId))!;
-    }
+    // Seed sample clients into the caller's OWN workspace, not a shared one.
+    const { tenantId } = await requireWorkspace(ctx);
+    const tenant = (await ctx.db.get(tenantId))!;
 
     const accounts = await ctx.db
       .query("clientAccounts")
@@ -836,11 +850,10 @@ export const seedDemo = mutation({
 export const resetDemo = mutation({
   args: {},
   handler: async (ctx) => {
-    // Removes generated demo work. Events are never deleted — the append-only
-    // history is the product.
-    const tenants = await ctx.db.query("tenants").collect();
-    const tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
-    if (!tenant) return { removed: 0 };
+    // Removes generated demo work from the caller's own workspace. Events are
+    // never deleted — the append-only history is the product.
+    const { tenantId } = await requireWorkspace(ctx);
+    const tenant = (await ctx.db.get(tenantId))!;
     let removed = 0;
     const accounts = await ctx.db
       .query("clientAccounts")
@@ -893,15 +906,12 @@ export const resetDemo = mutation({
 export const getQueue = query({
   args: {},
   handler: async (ctx) => {
-    // Interim tenant scoping: until authentication and workspace membership
-    // land, the app operates inside the demo workspace tenant. Never widen
-    // this back to a cross-tenant scan (invariant: tenant isolation).
-    const tenants = await ctx.db.query("tenants").collect();
-    const tenant = tenants.find((t) => t.name === MOCK_TENANT.name);
-    if (!tenant) return [];
+    // Tenant isolation: only the signed-in user's own workspace.
+    const tenantId = await getWorkspaceId(ctx);
+    if (!tenantId) return [];
     const deliverables = await ctx.db
       .query("deliverables")
-      .withIndex("by_tenant_status", (q) => q.eq("tenantId", tenant._id))
+      .withIndex("by_tenant_status", (q) => q.eq("tenantId", tenantId))
       .order("desc")
       .collect();
     return await Promise.all(
@@ -935,18 +945,25 @@ export const getQueue = query({
 
 export const getEventsForDeliverable = query({
   args: { deliverableId: v.id("deliverables") },
-  handler: async (ctx, args) =>
-    ctx.db
+  handler: async (ctx, args) => {
+    const tenantId = await getWorkspaceId(ctx);
+    if (!tenantId) return [];
+    const events = await ctx.db
       .query("events")
       .withIndex("by_subject", (q) => q.eq("subjectRef", args.deliverableId))
-      .collect(),
+      .collect();
+    // Isolation: only surface events from the caller's workspace.
+    return events.filter((e) => e.tenantId === tenantId);
+  },
 });
 
 export const getProofContext = query({
   args: { deliverableId: v.id("deliverables") },
   handler: async (ctx, args) => {
+    const tenantId = await getWorkspaceId(ctx);
     const deliverable = await ctx.db.get(args.deliverableId);
     if (!deliverable) return null;
+    if (deliverable.tenantId !== tenantId) return null;
     const draft = await latestDraft(ctx, args.deliverableId);
     const verifications = draft
       ? await ctx.db
@@ -964,11 +981,15 @@ export const getProofContext = query({
 
 export const getRecord = query({
   args: { subjectRef: v.string() },
-  handler: async (ctx, args) =>
-    ctx.db
+  handler: async (ctx, args) => {
+    const tenantId = await getWorkspaceId(ctx);
+    if (!tenantId) return [];
+    const events = await ctx.db
       .query("events")
       .withIndex("by_subject", (q) => q.eq("subjectRef", args.subjectRef))
-      .collect(),
+      .collect();
+    return events.filter((e) => e.tenantId === tenantId);
+  },
 });
 
 /** The signed-in user's public identity, or null when unauthenticated. */

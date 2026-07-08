@@ -138,7 +138,7 @@ function mapEvent(doc: any): Event {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export async function getQueueDetails(): Promise<QueueRow[]> {
-  const rows = await client().query(api.galley.getQueue, {});
+  const rows = await (await authedClient()).query(api.galley.getQueue, {});
   return rows
     .filter((row) => row.account)
     .map((row) => ({
@@ -156,24 +156,24 @@ export async function getQueueDetails(): Promise<QueueRow[]> {
 }
 
 export async function listEventsForDeliverable(deliverableId: string): Promise<Event[]> {
-  const rows = await client().query(api.galley.getEventsForDeliverable, {
+  const rows = await (await authedClient()).query(api.galley.getEventsForDeliverable, {
     deliverableId: deliverableId as Id<"deliverables">,
   });
   return rows.map(mapEvent);
 }
 
 export async function seedDemo(): Promise<{ created: number }> {
-  return await client().mutation(api.galley.seedDemo, {});
+  return await (await authedClient()).mutation(api.galley.seedDemo, {});
 }
 
 export async function resetDemo(): Promise<{ removed: number }> {
-  return await client().mutation(api.galley.resetDemo, {});
+  return await (await authedClient()).mutation(api.galley.resetDemo, {});
 }
 
 export async function listAccountsWithPlaybooks(): Promise<
   Array<{ account: ClientAccount; playbook: Playbook | null }>
 > {
-  const rows = await client().query(api.galley.listAccounts, {});
+  const rows = await (await authedClient()).query(api.galley.listAccounts, {});
   return rows.map((row) => ({
     account: mapAccount(row.account),
     playbook: row.playbook ? mapPlaybook(row.playbook) : null,
@@ -189,7 +189,7 @@ export async function intakeDraft(input: {
   content: string;
   source: string;
 }): Promise<{ deliverableId: string; result: "pass" | "fail" }> {
-  return await client().mutation(api.galley.intakeDraft, {
+  return await (await authedClient()).mutation(api.galley.intakeDraft, {
     ...input,
     accountId: input.accountId as Id<"clientAccounts">,
   });
@@ -207,7 +207,7 @@ export async function createClientWithPlaybook(input: {
   channels: string[];
   reportingKpi: string;
 }): Promise<{ accountId: string; playbookId: string; version: number }> {
-  return await client().mutation(api.galley.createClientWithPlaybook, input);
+  return await (await authedClient()).mutation(api.galley.createClientWithPlaybook, input);
 }
 
 export async function recordProofDecision(input: {
