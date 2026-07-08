@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Check, CircleAlert, Clock3, Eye, FileCheck2, ShieldCheck } from "lucide-react";
+import { Eye, FileCheck2, ShieldCheck } from "lucide-react";
 import { DemoControls } from "@/components/galley/DemoControls";
 import { ProofActions } from "@/components/galley/ProofActions";
+import { VerificationLayers } from "@/components/galley/VerificationLayers";
 import { getQueueDetails, isBackendConfigured } from "@/lib/galley/convexData";
 import type { DeliverableStatus } from "@/lib/galley/types";
 
@@ -39,11 +40,11 @@ export default async function ProofQueuePage({ searchParams }: { searchParams: P
     <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_18rem]"><div>
       {(!configured || error) && <section className="border border-warning/30 bg-warning/5 p-6"><h2 className="font-semibold">Persistence setup required</h2><p className="mt-2 text-sm leading-6 text-muted">{error || "Set NEXT_PUBLIC_CONVEX_URL and deploy the Convex functions to load persisted work."}</p></section>}
       {configured && !error && details.length === 0 && <section className="border border-border bg-surface px-6 py-20 text-center"><FileCheck2 size={24} className="mx-auto text-primary" /><h2 className="mt-5 text-lg font-semibold">No deliverables in this state.</h2><p className="mt-2 text-sm text-muted">Seed the local demo or choose another queue state.</p></section>}
-      {details.length > 0 && <div className="border border-border bg-surface"><div className="hidden grid-cols-[1.2fr_.7fr_1fr_.65fr_auto] gap-5 border-b border-border px-6 py-3 font-mono text-[9px] uppercase tracking-wider text-slate lg:grid"><span>Deliverable</span><span>Client</span><span>Verifier evidence</span><span>Status</span><span>Human action</span></div>
-        {details.map(({ deliverable, account, playbook, draft, verification }) => { const canProof = deliverable.status === "awaiting_proof" && verification?.result === "pass"; return <article key={deliverable.id} className="grid gap-5 border-b border-border px-6 py-6 last:border-0 lg:grid-cols-[1.2fr_.7fr_1fr_.65fr_auto] lg:items-center">
+      {details.length > 0 && <div className="border border-border bg-surface"><div className="hidden grid-cols-[1.2fr_.7fr_1fr_.65fr_auto] gap-5 border-b border-border px-6 py-3 font-mono text-[9px] uppercase tracking-wider text-slate lg:grid"><span>Deliverable</span><span>Client</span><span>Two-layer verification</span><span>Status</span><span>Human action</span></div>
+        {details.map(({ deliverable, account, playbook, draft, deterministicVerification, llmVerification }) => { const canProof = deliverable.status === "awaiting_proof"; return <article key={deliverable.id} className="grid gap-5 border-b border-border px-6 py-6 last:border-0 lg:grid-cols-[1.2fr_.7fr_1fr_.65fr_auto] lg:items-center">
           <div className="min-w-0"><p className="font-mono text-[9px] uppercase tracking-wider text-slate">Draft v{draft?.version ?? 0} · {deliverable.channel}</p><h2 className="mt-2 font-semibold">{deliverable.title}</h2><p className="mt-3 line-clamp-2 text-sm leading-6 text-slate">“{draft?.content ?? "Draft unavailable."}”</p></div>
           <div><p className="text-sm font-medium text-ink-soft">{account.name}</p><p className="mt-1 font-mono text-[8px] uppercase tracking-wider text-slate">Playbook v{playbook?.version ?? "—"}</p></div>
-          <div><p className={`flex items-center gap-2 text-xs font-medium ${verification?.result === "pass" ? "text-success" : verification?.result === "fail" ? "text-danger" : "text-proof-blue"}`}>{verification?.result === "pass" ? <Check size={14}/> : verification?.result === "fail" ? <CircleAlert size={14}/> : <Clock3 size={14}/>} {verification?.result === "pass" ? "Passed" : verification?.result === "fail" ? "Failed" : "Pending"}</p><ul className="mt-2 space-y-1 text-[11px] leading-4 text-slate">{(verification?.reasons ?? ["No result attached."]).slice(0,2).map((reason) => <li key={reason}>— {reason}</li>)}</ul></div>
+          <VerificationLayers deterministic={deterministicVerification} llm={llmVerification} />
           <span className={`w-fit border border-current/30 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-wider ${styles[deliverable.status]}`}>{labels[deliverable.status]}</span>
           <div>{canProof ? <ProofActions deliverableId={deliverable.id} draftContent={draft?.content ?? ""}/> : <p className="max-w-48 text-xs leading-5 text-slate">{deliverable.status === "escalated" ? "Verifier failure needs attention." : "The recorded state does not permit a proof decision."}</p>}<Link href={`/dashboard/records?deliverable=${deliverable.id}`} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-proof-blue"><Eye size={13}/> View record</Link></div>
         </article>; })}

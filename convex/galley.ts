@@ -102,15 +102,23 @@ async function latestDraft(
     .first();
 }
 
-async function latestVerification(
+/** Split a draft's verification rows into the two layers by rubric prefix. */
+async function verificationLayers(
   ctx: QueryCtx | MutationCtx,
   draftId: Id<"drafts">,
-): Promise<Doc<"verifications"> | null> {
-  return await ctx.db
+): Promise<{
+  deterministic: Doc<"verifications"> | null;
+  llm: Doc<"verifications"> | null;
+  latest: Doc<"verifications"> | null;
+}> {
+  const rows = await ctx.db
     .query("verifications")
     .withIndex("by_draft", (q) => q.eq("draftId", draftId))
-    .order("desc")
-    .first();
+    .collect();
+  const byNewest = [...rows].sort((a, b) => b._creationTime - a._creationTime);
+  const deterministic = byNewest.find((r) => r.rubricVersion.startsWith("galley-rules")) ?? null;
+  const llm = byNewest.find((r) => r.rubricVersion.startsWith("galley-llm")) ?? null;
+  return { deterministic, llm, latest: byNewest[0] ?? null };
 }
 
 /**
@@ -901,12 +909,25 @@ export const getQueue = query({
         const account = await ctx.db.get(deliverable.accountId);
         const playbook = await latestPlaybook(ctx, deliverable.accountId);
         const draft = await latestDraft(ctx, deliverable._id);
-        const verification = draft ? await latestVerification(ctx, draft._id) : null;
+        const layers = draft
+          ? await verificationLayers(ctx, draft._id)
+          : { deterministic: null, llm: null, latest: null };
         const events = await ctx.db
           .query("events")
           .withIndex("by_subject", (q) => q.eq("subjectRef", deliverable._id))
           .collect();
-        return { deliverable, account, playbook, draft, verification, eventCount: events.length };
+        return {
+          deliverable,
+          account,
+          playbook,
+          draft,
+          // `verification` stays for back-compat; `deterministic`/`llm` expose
+          // the two-layer verification distinctly for the proof surface.
+          verification: layers.latest,
+          deterministicVerification: layers.deterministic,
+          llmVerification: layers.llm,
+          eventCount: events.length,
+        };
       }),
     );
   },

@@ -46,6 +46,8 @@ export interface QueueRow {
   playbook: Playbook | null;
   draft: Draft | null;
   verification: Verification | null;
+  deterministicVerification: Verification | null;
+  llmVerification: Verification | null;
   eventCount: number;
 }
 
@@ -145,6 +147,10 @@ export async function getQueueDetails(): Promise<QueueRow[]> {
       playbook: row.playbook ? mapPlaybook(row.playbook) : null,
       draft: row.draft ? mapDraft(row.draft) : null,
       verification: row.verification ? mapVerification(row.verification) : null,
+      deterministicVerification: row.deterministicVerification
+        ? mapVerification(row.deterministicVerification)
+        : null,
+      llmVerification: row.llmVerification ? mapVerification(row.llmVerification) : null,
       eventCount: row.eventCount as number,
     }));
 }
