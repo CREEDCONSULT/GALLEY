@@ -15,8 +15,10 @@ The governed loop: **Produce → Verify → Proof → Schedule → Report.**
 - **Domain invariant check (mock)**: `npm run validate:galley`
 - **Verifier rules contract**: `npm run validate:galley:verifier`
 - **Verifier eval (precision/recall gate)**: `npm run eval:galley:verifier` (golden set in
-  `lib/galley/eval/`; gates on PRD §7 thresholds; reports the paraphrase/voice gap for the LLM layer)
+  `lib/galley/eval/`; gates on PRD §7 thresholds; deterministic layer only)
 - **LLM-verifier helper contract**: `npm run validate:galley:llm`
+- **LLM gap-closure measurement**: `npm run eval:galley:llm` (runs the golden-set gap cases through
+  the live LLM layer; needs `ANTHROPIC_API_KEY` on the deployment; not a CI gate)
 - **Convex live smoke test**: `npm run smoke:galley:convex` (full loop + human-gate + auth invariants against the dev deployment)
 - **Convex deploy (dev)**: `npx convex dev --once` (uses `CONVEX_DEPLOY_KEY` from `.env.local`)
 
@@ -47,7 +49,12 @@ Run typecheck + build + `validate:galley` before claiming work complete.
   Draft, Verification, Approval, Event)
 - `lib/galley/invariants.ts` — domain invariants (approval-before-scheduling)
 - `lib/galley/verifier.ts` — deterministic verification rules engine (pure; shared by app,
-  Convex functions, and validation scripts; rubric-versioned)
+  Convex functions, and validation scripts; rubric `galley-rules-v0.3`)
+- `lib/galley/llmVerifier.ts` — pure prompt-builder + response parser for the LLM-graded layer;
+  `convex/verifierLlm.ts` runs it (Claude Haiku, rubric `galley-llm-v0.1`) as a scheduled second
+  pass after the deterministic pass — escalates a draft that carries a paraphrased forbidden claim.
+  No-ops without `ANTHROPIC_API_KEY`.
+- `lib/galley/eval/goldenSet.ts` — labeled golden set for the eval harness
 - `lib/galley/convexData.ts` — server-only Convex facade (maps Convex docs to canonical types;
   `authedClient()` attaches the signed-in user's token for authenticated mutations)
 - `lib/galley/mockValidationNode.ts` — deterministic mock state for the demo seed
