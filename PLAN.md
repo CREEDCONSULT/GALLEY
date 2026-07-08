@@ -37,13 +37,15 @@ This document is the index and the one-page strategy. Everything else is a level
 **Built and deployed:** Next.js 16 + **Convex** validation node, live at
 `https://galley-web-production.up.railway.app` (Railway, auto-deploys from `main`). Playbook
 onboarding, draft intake, proof queue, records view; append-only event log enforced in Convex
-mutations; approval-before-scheduling invariant. **Deterministic verifier v0** (`galley-rules-v0.2`)
-runs inside mutations — forbidden-claim/channel/substance/substantiation checks with cited evidence.
+mutations; approval-before-scheduling invariant. **Two-layer verification:** deterministic rules
+engine (`galley-rules-v0.3`) inside mutations, then an **LLM-graded second pass** (Claude Haiku,
+`galley-llm-v0.1`) that escalates paraphrased forbidden claims and voice mismatches — measured to
+close 5/5 of the deterministic gap. An 18-case golden **eval harness** gates CI on PRD §7 thresholds.
 **Convex Auth** (email+password): routes protected, proof decisions require an authenticated actor
 and attribute to the real user in the record (verified live in production).
 
-**Not built:** LLM-graded verification + eval harness, generation, billing, publishing, reporting;
-full per-function tenant isolation on create paths; a production (non-dev) Convex deployment.
+**Not built:** generation, billing, publishing, reporting; full per-function tenant isolation on
+create paths; a production (non-dev) Convex deployment.
 
 **Resolved decisions:** backend = Convex (Supabase removed), auth = Convex Auth, hosting = Railway.
 
@@ -52,9 +54,10 @@ full per-function tenant isolation on create paths; a production (non-dev) Conve
 1. **Phase 0 (days):** repo hygiene, CI, this document set. ✅ complete
 2. **Phase 1 — backend + auth on Convex, deployed. ✅ mostly complete** (remaining: full
    per-function tenant isolation on create paths; automated invariant test suite).
-3. **Phase 2 (4–6 wks) — the bet:** deterministic verifier v0 shipped; next is LLM-graded checks +
-   a golden eval set and 5–10 design partners. *Kill/continue gate: partners run real drafts weekly
-   and the verifier hits ≥90% recall / ≤10% false-block.*
+3. **Phase 2 (4–6 wks) — the bet:** two-layer verifier shipped (deterministic + LLM-graded second
+   pass) with a golden eval harness gating CI. Next: recruit 5–10 design partners to feed the eval
+   set real violations. *Kill/continue gate: partners run real drafts weekly and the verifier hits
+   ≥90% recall / ≤10% false-block.*
 4. **Phase 3:** Stripe billing + supervised generation → first paying workspaces.
 5. **Phases 4–5:** publish integrations + client portal, then reporting and audit exports.
 

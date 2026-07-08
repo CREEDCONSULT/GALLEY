@@ -1,5 +1,13 @@
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  mutation,
+  query,
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { approvalAction } from "./schema";
@@ -201,6 +209,12 @@ async function runVerification(
       type: "proof.awaiting",
       subjectRef: deliverable._id,
       payload: { verificationId, draftId: draft._id },
+    });
+    // Second pass: the LLM-graded layer runs after this mutation commits and
+    // may escalate a draft that passed deterministic checks but carries a
+    // paraphrased forbidden claim. No-ops when ANTHROPIC_API_KEY is unset.
+    await ctx.scheduler.runAfter(0, internal.verifierLlm.runLlmPass, {
+      deliverableId: deliverable._id,
     });
   }
   return report.result;
@@ -945,5 +959,88 @@ export const currentUser = query({
     const user = await ctx.db.get(userId);
     if (!user) return null;
     return { name: user.name ?? null, email: user.email ?? null };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// LLM-graded second pass (internal; driven by the scheduler + a Convex action)
+// ---------------------------------------------------------------------------
+
+/** Latest-draft + playbook context the LLM pass needs. Internal only. */
+export const getVerificationInput = internalQuery({
+  args: { deliverableId: v.id("deliverables") },
+  handler: async (ctx, args) => {
+    const deliverable = await ctx.db.get(args.deliverableId);
+    if (!deliverable) return null;
+    const draft = await latestDraft(ctx, args.deliverableId);
+    const playbook = await latestPlaybook(ctx, deliverable.accountId);
+    if (!draft || !playbook) return null;
+    return {
+      draftId: draft._id,
+      content: draft.content,
+      channel: deliverable.channel,
+      voice: playbook.voice,
+      approvedClaims: playbook.approvedClaims,
+      forbiddenClaims: playbook.forbiddenClaims,
+    };
+  },
+});
+
+/**
+ * Persist an LLM verification result as a second verification row and, if it
+ * found a forbidden-claim paraphrase (a block finding), escalate the
+ * deliverable out of the proof queue for a human. Internal only — invoked by
+ * verifierLlm.runLlmPass after the deterministic pass commits.
+ */
+export const applyLlmVerification = internalMutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+    draftId: v.id("drafts"),
+    findings: v.array(
+      v.object({
+        rule: v.string(),
+        severity: v.string(),
+        evidence: v.string(),
+        constraint: v.string(),
+      }),
+    ),
+    rubricVersion: v.string(),
+    model: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const deliverable = await ctx.db.get(args.deliverableId);
+    if (!deliverable) return;
+    // The draft may have been superseded (a new version verified) between the
+    // schedule and this run; only apply to the still-current draft.
+    const current = await latestDraft(ctx, args.deliverableId);
+    if (!current || current._id !== args.draftId) return;
+
+    const blocks = args.findings.filter((f) => f.severity === "block");
+    const result = blocks.length > 0 ? "fail" : "pass";
+    const reasons =
+      args.findings.length > 0
+        ? args.findings.map((f) => `${f.rule}: ${f.evidence}`)
+        : ["LLM pass found no paraphrase or voice violations."];
+
+    const verificationId = await ctx.db.insert("verifications", {
+      tenantId: deliverable.tenantId,
+      draftId: args.draftId,
+      result,
+      reasons,
+      rubricVersion: args.rubricVersion,
+    });
+    await appendEvent(ctx, {
+      tenantId: deliverable.tenantId,
+      accountId: deliverable.accountId,
+      actorType: "verifier",
+      actorLabel: `Galley LLM verifier (${args.model})`,
+      type: result === "pass" ? "verification.passed" : "verification.failed",
+      subjectRef: args.deliverableId,
+      payload: { verificationId, layer: "llm", findings: args.findings },
+    });
+
+    if (result === "fail" && deliverable.status === "awaiting_proof") {
+      await transition(ctx, deliverable, "escalated", "Galley LLM verifier");
+    }
   },
 });

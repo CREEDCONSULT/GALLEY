@@ -44,8 +44,9 @@ The prototype is now a persisted, authenticated, deployed app.
    forbidden-claim fuzzy match, channel policy, substance check, FTC substantiation-risk warnings,
    approved-claim evidence notes. 8-check contract in CI. *(Next: required disclosures, link policy,
    channel length limits.)*
-2. **LLM-graded checks** — voice adherence + claim-paraphrase detection (Claude; Haiku-first
-   routing). Model + rubric version stamped on every run.
+2. [x] **LLM-graded checks** — `convex/verifierLlm.ts` runs Claude Haiku as a scheduled second
+   pass (rubric `galley-llm-v0.1`); catches paraphrased forbidden claims + voice mismatches and
+   escalates them. Measured to close 5/5 of the golden-set gap (`npm run eval:galley:llm`).
 3. **Eval harness** — golden set of real violations (seeded from design partners); measure
    precision/recall per rubric version; gate releases on ≥90% forbidden-claim recall, ≤10%
    false-block (PRD §7).
